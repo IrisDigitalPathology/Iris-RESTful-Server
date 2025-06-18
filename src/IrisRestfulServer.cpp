@@ -8,17 +8,24 @@
  * @copyright Copyright (c) 2025 Iris Developers
  * 
  */
-
 #include "IrisRestfulPriv.hpp"
 Iris::RESTful::Server Iris::RESTful::create_server(const std::filesystem::path& root)
 {
+    // Format the path string
+    auto mut_path = std::filesystem::path(root).make_preferred();
+    if (mut_path.string().back() != std::filesystem::path::preferred_separator)
+        mut_path+=std::filesystem::path::preferred_separator;
+    
     // Ensure the directory containing the slide files exists
-    if (std::filesystem::is_directory(root) == false) {
-        std::cerr << "ERROR: Provided slide root directory does not exist\n";
+    if (std::filesystem::is_directory(mut_path) == false) {
+        std::cerr   << "ERROR: file system reports the provided slide root directory ("
+                    << mut_path
+                    << ") does not exist\n";
         return nullptr;
     }
+    
     // Create a server instance
-    return std::make_shared<__INTERNAL__Server>(root);
+    return std::make_shared<__INTERNAL__Server>(mut_path);
 }
 Iris::Result Iris::RESTful::server_listen(const Server& server, uint16_t port)
 {
@@ -109,7 +116,7 @@ Slide __INTERNAL__Server::get_slide (const std::string &id)
     // We will open a new slide instead.
     // Create the slide
     
-    std::filesystem::path file_path (_root.string()+"/"+id+".iris");
+    std::filesystem::path file_path (_root.string()+id+".iris");
     Slide slide;
     try { slide = validate_and_open_slide(file_path);}
     catch (std::runtime_error &error) {

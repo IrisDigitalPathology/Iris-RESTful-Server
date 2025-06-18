@@ -16,16 +16,17 @@ Iris::RESTful::Slide Iris::RESTful::validate_and_open_slide (const std::filesyst
     using namespace IrisCodec;
     
     if (!std::filesystem::exists(file_path)) throw std::runtime_error
-        ("File does not exist");
+        (std::string("File (")+file_path.string()+ std::string(") does not exist"));
     
     auto file = open_file(FileOpenInfo {
         .filePath = file_path,
         .writeAccess = false,
     });
+    if (!file) throw std::runtime_error
+        ("Failed to open file");
+    
     auto ptr    = file->ptr;
     auto size   = file->size;
-    
-    // Test that the file is an Iris codec file
     if (!IrisCodec::is_Iris_Codec_file(ptr, size)) throw std::runtime_error
         ("Not an Iris slide file");
     

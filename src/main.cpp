@@ -5,7 +5,22 @@
 //  Created by Ryan Landvater on 6/7/25.
 //
 #include <iostream>
+#include <csignal>
 #include "IrisResfultCore.hpp"
+volatile sig_atomic_t terminate_flag = 0;
+void INTERP_CSIGNAL (int param)
+{
+    switch (param) {
+        case SIGINT:
+        case SIGTERM:
+        case SIGQUIT:
+            std::cout << "Shutting down..." << std::endl;
+            terminate_flag = 1;
+            return;
+        default:
+            break;
+    }
+}
 int main(int argc, char* argv[])
 {
     // Check command line arguments.
@@ -43,10 +58,12 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
     
-    std::string input;
-    do {
-        std::cin >> input;
-    } while (input.compare("quit") && input.compare("exit"));
-
+    signal(SIGTERM,INTERP_CSIGNAL);
+    signal(SIGINT,INTERP_CSIGNAL);
+    signal(SIGQUIT,INTERP_CSIGNAL);
+    
+    while (!terminate_flag)
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    
     return EXIT_SUCCESS;
 }

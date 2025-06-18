@@ -31,5 +31,6 @@
 **/secrets.dev.yaml
 **/values.dev.yaml
 **/build
+**/Docker
 LICENSE
 README.md
