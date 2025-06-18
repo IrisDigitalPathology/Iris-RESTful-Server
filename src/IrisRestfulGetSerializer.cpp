@@ -23,6 +23,7 @@ inline std::string SERIALIZE_FORMAT (const Iris::Format &format)
         case FORMAT_B8G8R8A8:   return "\"FORMAT_B8G8R8A8\"";
         case FORMAT_R8G8B8A8:   return "\"FORMAT_R8G8B8A8\"";
     }
+    return "\"UNDEFINED FORMAT\"";
 }
 inline std::string SERIALIZE_ENCODING (const IrisCodec::Encoding &encoding)
 {
@@ -32,6 +33,7 @@ inline std::string SERIALIZE_ENCODING (const IrisCodec::Encoding &encoding)
         case IrisCodec::TILE_ENCODING_JPEG:         return "\"image/jpeg\"";
         case IrisCodec::TILE_ENCODING_AVIF:         return "\"image/avif\"";
     }
+    return "\"UNDEFINED ENCODING\"";
 }
 inline void SERIALIZE_LAYER_EXTENT (const LayerExtents &extent, std::stringstream& stream)
 {
@@ -88,6 +90,7 @@ std::string serialize_get_response (const GetResponse& response)
             assert(false && "ERROR: cannot perform serialize_get_response on GET_RESPONSE_TILE response; this is a binary response");
             throw std::runtime_error("ERROR: cannot serialize_get_response a GET_RESPONSE_TILE response; this is a binary response");
     }
+    throw std::runtime_error("ERROR: cannot serialize_get_response; undefined GetResponse type");
 }
 } // END RESTFUL
 } // END IRIS

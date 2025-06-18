@@ -1,0 +1,15 @@
+
+
+services:
+  iris-restful:
+    build:
+      context: ../
+      dockerfile: ./Docker/Dockerfile
+      target: deploy
+    ports:
+      - 3000:3000
+    restart: always
+    volumes:
+      - slides:/slides
+volumes:
+  slides:

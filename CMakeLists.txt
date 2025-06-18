@@ -8,7 +8,7 @@ include(ExternalProject)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -O3")
+set(CMAKE_CXX_FLAGS "-O3") # Agressively optimize for speed
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_SERVER "Build the RESTful Server Implementation" ON)
@@ -19,56 +19,6 @@ PROJECT (
     IrisRESTfulServer
     LANGUAGES CXX
     # VERSION ${IRIS_CODEC_VERSION_STRING}
-)
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Boost Modules Inclusion
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# These modules are needed for networking presently
-add_compile_definitions(BOOST_ASIO_HAS_STD_INVOKE_RESULT)
-set (
-    BOOST_SUBMODULES
-    libs/asio
-    libs/align
-    libs/assert
-    libs/beast
-    libs/bind
-    libs/core
-    libs/config
-    libs/container_hash
-    libs/date_time
-    libs/describe
-    libs/exception
-    libs/filesystem 
-    libs/interprocess 
-    libs/intrusive 
-    libs/io 
-    libs/logic 
-    libs/move
-    libs/mpl
-    libs/mp11
-    libs/numeric 
-    libs/optional 
-    libs/predef
-    libs/preprocessor
-    libs/program_options
-    libs/smart_ptr
-    libs/static_assert
-    libs/static_string
-    libs/system
-    libs/throw_exception
-    libs/type_traits
-    libs/tuple
-    libs/utility
-)
-FetchContent_Declare (
-    Boost
-    GIT_REPOSITORY https://github.com/boostorg/boost
-    GIT_TAG "ab7968a"
-    GIT_SHALLOW ON
-    FETCHCONTENT_UPDATES_DISCONNECTED ON   
-    SOURCE_SUBDIR do_not_build
-    GIT_SUBMODULES ${BOOST_SUBMODULES} 
 )
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -116,7 +66,6 @@ FetchContent_Declare (
 )
 message(STATUS "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 FetchContent_MakeAvailable(
-    Boost
     IrisHeaders
     IrisFileExtension
     IrisCodec
@@ -155,13 +104,21 @@ set (
     ${irisheaders_SOURCE_DIR}/include
     ${irisheaders_SOURCE_DIR}/priv
 )
-add_library(
+add_library (
     IrisRestfulLib OBJECT
     ${ServerSources}
 )
 target_include_directories (
     IrisRestfulLib PRIVATE
     ${ServerInclude}
+)
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Iris RESTful Server Targets
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+set (
+    IrisRESTfulTargets
+    IrisRestfulLib
 )
 
 if (BUILD_SERVER)
@@ -176,22 +133,23 @@ if (BUILD_SERVER)
         PRIVATE Threads::Threads
     )
     target_include_directories (
-    IrisRESTful PRIVATE
-    ${ServerInclude}
-)
+        IrisRESTful PRIVATE
+        ${ServerInclude}
+    )
+    set(IrisRESTfulTargets ${IrisRESTfulTargets} IrisRESTful)
 endif()
 
 if (IRIS_BUILD_SHARED)
     add_library(
-        IrisRestful SHARED 
+        IrisRestfulShared SHARED 
         $<TARGET_OBJECTS:IrisFileExtensionLib>
         $<TARGET_OBJECTS:IrisRestfulLib>
     )
     target_link_libraries(
-        IrisRestful
+        IrisRestfulShared
         PRIVATE Threads::Threads
     )
-    set(IrisCodecTargets ${IrisCodecTargets} IrisCodec)
+    set(IrisRESTfulTargets ${IrisRESTfulTargets} IrisRestfulShared)
 endif()
 
 if (IRIS_BUILD_STATIC)
@@ -204,5 +162,35 @@ if (IRIS_BUILD_STATIC)
         IrisRestfulStatic
         PRIVATE Threads::Threads
     )
-    set(IrisCodecTargets ${IrisCodecTargets} IrisCodecStatic)
+    set(IrisRESTfulTargets ${IrisRESTfulTargets} IrisRestfulStatic)
 endif(IRIS_BUILD_STATIC)
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Installation
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+if (${PROJECT_IS_TOP_LEVEL})
+
+    install(
+        TARGETS IrisHeaders
+        EXPORT IrisHeadersConfig
+        FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Iris
+    )
+    install(
+        EXPORT IrisHeadersConfig
+        FILE IrisHeadersConfig.cmake
+        NAMESPACE "Iris::"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Iris
+    )
+    install(
+        TARGETS ${IrisRESTfulTargets}
+        EXPORT IrisRESTfulConfig
+        FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Iris
+    )
+    install(
+        EXPORT IrisRESTfulConfig
+        FILE IrisRESTfulConfig.cmake
+        NAMESPACE "Iris::"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Iris
+    )
+endif()
