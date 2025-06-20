@@ -56,7 +56,7 @@ inline GetRequest::Type PARSE_COMMAND (const char* const front, const char* cons
         assert(false&&"NOT BUILT YET");
     else if (back_token.compare("slide_label") == 0)
         assert(false&&"NOT BUILT YET");
-    else if (back_token.compare("rendered"))
+    else if (back_token.compare("rendered") == 0)
         assert(false&&"NOT BUILT  YET");
     
     return GetRequest::GET_REQUEST_UNDEFINED;
@@ -131,28 +131,28 @@ inline std::unique_ptr<GetRequest> PARSE_DICOM_REQUEST (const char* loc, const c
             request->protocol   = GetRequest::GET_REQUEST_DICOM;
             request->type       = GetRequest::GET_REQUEST_TILE;
             if (PARSE_FRONT_TOKEN(loc, end).compare("series")) {
-                error_string = "Expected 'series' following study in DICOM/WADO-RS target URL. Please ensure tile requests conform to IrisRestful API compliant WADO-RS commands.";
+                error_string = "Expected 'series' following study identifier in DICOM/WADO-RS target URL.";
                 goto MALFORMED_DICOM_REQUEST;
             }
             request->id         = PARSE_FRONT_TOKEN(loc, end);
             if (PARSE_FRONT_TOKEN(loc, end).compare("instances")) {
-                error_string = "Expected 'instances' following series in DICOM/WADO-RS target URL. Please ensure tile requests conform to IrisRestful API compliant WADO-RS commands.";
+                error_string = "Expected 'instances' following series in DICOM/WADO-RS target URL.";
                 goto MALFORMED_DICOM_REQUEST;
             }
             auto layer          = PARSE_FRONT_TOKEN(loc, end);
             auto result         = std::from_chars (layer.data(), layer.data()+layer.size(), request->layer);
             if (result.ec == std::errc::invalid_argument) {
-                error_string = "Expected numerical 'instances' value in DICOM/WADO-RS target URL representing the resolution layer. Please ensure tile requests conform to IrisRestful API compliant WADO-RS commands.";
+                error_string = "Expected numerical 'instances' value in DICOM/WADO-RS target URL representing the resolution layer.";
                 goto MALFORMED_DICOM_REQUEST;
             }
             if (PARSE_FRONT_TOKEN(loc, end).compare("frames")) {
-                error_string = "Expected 'instances' following series in DICOM/WADO-RS target URL. Please ensure tile requests conform to IrisRestful API compliant WADO-RS commands.";
+                error_string = "Expected 'instances' following series in DICOM/WADO-RS target URL.";
                 goto MALFORMED_DICOM_REQUEST;
             }
             auto tile           = PARSE_FRONT_TOKEN(loc, end);
             result              = std::from_chars (tile.data(), tile.data()+tile.size(), request->tile);
             if (result.ec == std::errc::invalid_argument) {
-                error_string = "Expected numerical 'instances' value in DICOM/WADO-RS target URL representing the resolution layer. Please ensure tile requests conform to IrisRestful API compliant WADO-RS commands.";
+                error_string = "Expected numerical 'instances' value in DICOM/WADO-RS target URL representing the resolution layer.";
                 goto MALFORMED_DICOM_REQUEST;
             }
             return request;

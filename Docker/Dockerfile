@@ -24,9 +24,7 @@ RUN adduser \
     --shell "/sbin/nologin" \
     --no-create-home \
     --uid "${UID}" \
-    SlideServer && \
-    mkdir /slides
-
+    SlideServer
 USER SlideServer
 
 COPY --from=build_env /usr/local/bin/IrisRESTful /usr/local/bin/
