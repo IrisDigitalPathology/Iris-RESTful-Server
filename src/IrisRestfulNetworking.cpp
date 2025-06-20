@@ -328,23 +328,6 @@ void __INTERNAL__Networking::send_response(const Session &session, const HTTPRes
         else    close_stream (session);
     });
 }
-void __INTERNAL__Networking::write_some(const Buffer &buffer, const HTTPResponseBuffer &response, const HTTPBufferSerializer &serializer, const Session &session) {
-    http::async_write_some(*(session->stream), *serializer, [this, serializer, session, response, buffer]
-                           (beast::error_code error, size_t bytes_transferred){
-        if (error) std::cout    << "Error writing response to stream: "
-            << error.message();
-        
-        if (serializer->is_done() == false) {
-            std::cout << "NOT DONE\n";
-            write_some(buffer, response, serializer, session);
-        } else {
-            if (response->keep_alive() && session->stream->socket().is_open())
-                read_request (session);
-            else    close_stream (session);
-        }
-        
-    });
-}
 void __INTERNAL__Networking::send_buffer(const Session &session, const HTTPResponseBuffer &response, const Buffer &buffer)
 {
     auto serializer = std::make_shared<http::serializer<false, http::buffer_body>> (*response);

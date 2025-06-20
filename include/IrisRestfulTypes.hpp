@@ -80,7 +80,7 @@ struct GetRequest {
     enum Protocol {
         GET_REQUEST_MALFORMED       = 0,
         GET_REQUEST_IRIS,
-        GET_REQUEST_DICOM
+        GET_REQUEST_DICOM,
     }           protocol            = GET_REQUEST_MALFORMED;
     enum Type {
         GET_REQUEST_UNDEFINED       = 0,
