@@ -61,7 +61,7 @@ ACTIVE      (true)
                             << error.message() << "\n";
             } catch (...) {
                 std::cout   << "Undefined network error\n";
-            } std::cout << "SHUTDOWN ";
+            }
         }};
 }
 __INTERNAL__Networking::~__INTERNAL__Networking ()
@@ -151,46 +151,39 @@ void __INTERNAL__Networking::read_request(const Session &session)
     session->stream->expires_after(std::chrono::seconds(30));
     
     auto buffer  = std::make_shared<ASIOBuffer_t>();
-    auto parser  = std::make_shared<http::request_parser<http::empty_body>>();
+    auto parser  = std::make_shared<http::request_parser<http::string_body>>();
     // This is a light-weight server; we don't expect big requests
-    // This will protect against attacks. Keep that attack surface small.
-    parser->header_limit(2048);
+    parser->header_limit(1024);
+    parser->body_limit(2048);
     
+//    http::async_read(*(session->stream), *buffer, *request,[this, session, buffer, request]
     http::async_read(*(session->stream), *buffer, *parser,[this, session, buffer, parser]
                      (beast::error_code error, size_t bytes_transferred) {
         if (error) {
             if(error == http::error::end_of_stream ||
                error == beast::error::timeout)
                 return close_stream (session);
-            else if (error == http::error::unexpected_body) {
+            
+            const auto response = std::make_shared<HTTPResponse_t>();
+            response->version(11);
+            response->set(http::field::content_type, "text/plain");
+            response->keep_alive(parser->is_header_done()?parser->keep_alive():false);
+            response->set(http::field::server, "IrisRESTful");
+            if (error == http::error::header_limit) {
                 // PROTECTION FROM DOS ATTACKS
-                auto response = std::make_shared<HTTPResponse_t>(http::status::bad_request, 11);
-                response->set(http::field::content_type, "text/html");
-                response->set(http::field::server, "IrisRESTful");
-                response->body() = "IrisRESTful API does not accept HTTP requests containing a body";
-                response->keep_alive (parser->keep_alive());
+                response->result(http::status::request_header_fields_too_large);
+                response->body() = "IrisRESTful API HTTP header-length limit (1024) bytes exceeded";
                 send_response (session, response);
-                return;
-            }
-            else if (error == http::error::header_limit) {
-                // PROTECTION FROM DOS ATTACKS
-                auto response = std::make_shared<HTTPResponse_t>(http::status::request_header_fields_too_large, 11);
-                response->set(http::field::content_type, "text/html");
-                response->set(http::field::server, "IrisRESTful");
-                response->body() = "IrisRESTful API HTTP header length (2048) bytes exceeded";
-                response->keep_alive (parser->keep_alive());
+            } else if (error == http::error::body_limit) {
+                response->result(http::status::payload_too_large);
+                response->body() = "IrisRESTful API payload-length limit (2048) bytes exceeded";
                 send_response (session, response);
-                return;
-            }
-            else {
-                auto response = std::make_shared<HTTPResponse_t>(http::status::unknown, 11);
-                response->set(http::field::content_type, "text/html");
-                response->set(http::field::server, "IrisRESTful");
+            } else {
+                response->result(http::status::unknown);
                 response->body() = "IrisRESTful API encountered undefined error: " + error.message();
-                response->keep_alive (parser->keep_alive());
                 send_response(session, response);
-                return;
             }
+            return;
         }
         
         // Begin interpreting the request
