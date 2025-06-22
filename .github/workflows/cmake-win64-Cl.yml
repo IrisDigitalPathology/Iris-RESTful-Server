@@ -1,0 +1,38 @@
+name: Iris Codec Windows CMake CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '*/README.md'
+  pull_request:
+    branches: 
+      - main
+    paths-ignore:
+      - '*/README.md'
+
+jobs:
+  build:
+      strategy:
+        fail-fast: false
+        
+        matrix:
+          os: [windows-latest]
+          build_type: [Release]
+          c_compiler: [cl]
+
+          include: 
+            - c_compiler: cl
+              cpp_complier: cl
+            - os: windows-latest
+              name: windows
+              arch: x86_64
+
+      uses: ./.github/workflows/build-win64.yml
+      with:
+        os: ${{ matrix.os }}
+        c_compiler: ${{ matrix.c_compiler }}
+        cpp_compiler: ${{ matrix.cpp_complier }}
+        build_type: ${{ matrix.build_type }}
+        artifact: ${{ matrix.name }}-${{ matrix.arch }}

@@ -1,0 +1,70 @@
+name: Iris RESTful Server Windows build
+
+on:
+    workflow_call:
+      inputs:
+        os:
+            required: true
+            type: string
+        c_compiler:
+            required: true
+            type: string
+        cpp_compiler:
+            required: true
+            type: string
+        build_type:
+            required: true
+            type: string
+        artifact:
+            required: true
+            type: string
+          
+
+jobs:
+  build:
+    runs-on: ${{ inputs.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Set build directory
+      id: strings
+      shell: bash
+      run: |
+        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+        echo "install-dir=${{ github.workspace }}/${{ inputs.artifact }}" >> "$GITHUB_OUTPUT"
+
+    - name: Export GitHub Actions Cache Environment Variables
+      uses: actions/github-script@v7
+      with:
+        script: |
+          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          
+    - name: Configure Vcpkg
+      run: >
+        git clone --depth 1 https://github.com/microsoft/vcpkg.git ${{ github.workspace }}\vcpkg && 
+        ${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat &&
+        ${{ github.workspace }}\vcpkg\vcpkg.exe install boost --binarysource="clear;x-gha,readwrite"
+
+    - name: Configure CMake
+      run: >
+        cmake -GNinja -B ${{ steps.strings.outputs.build-output-dir }}
+
+    - name: Build 
+      run: >
+        cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ inputs.build_type }}
+
+    - name: Package Build
+      run: > 
+        cmake --install ${{ steps.strings.outputs.build-output-dir }} &&
+        cp ${{ github.workspace }}/LICENSE ${{ steps.strings.outputs.install-dir }} &&
+        cp ${{ github.workspace }}/README.md ${{ steps.strings.outputs.install-dir }} &&
+        tar -cvf iris-restful-${{ inputs.artifact }}.tar.gz -C ${{ steps.strings.outputs.install-dir }} .
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact }}
+        path: iris-restful-${{ inputs.artifact }}.tar.gz

@@ -29,4 +29,8 @@ USER SlideServer
 
 COPY --from=build_env /usr/local/bin/IrisRESTful /usr/local/bin/
 
+LABEL org.opencontainers.image.source=https://github.com/IrisDigitalPathology/Iris-RESTful-Server.git
+LABEL org.opencontainers.image.description="Iris File Extension RESTful API Server"
+LABEL org.opencontainers.image.licenses=MIT
+
 ENTRYPOINT [ "IrisRESTful", "3000", "/slides" ]
