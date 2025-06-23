@@ -3,7 +3,6 @@
 
 cmake_minimum_required(VERSION 3.27)
 include(FetchContent)
-include(ExternalProject)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,6 +19,9 @@ PROJECT (
     LANGUAGES CXX
     # VERSION ${IRIS_CODEC_VERSION_STRING}
 )
+
+# Include the Boost libraries for ASIO support
+find_package(Boost REQUIRED CONFIG)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Iris Core Headers Inclusion
@@ -103,6 +105,7 @@ set (
     ${CODEC_SOURCE_DIR}
     ${irisheaders_SOURCE_DIR}/include
     ${irisheaders_SOURCE_DIR}/priv
+    ${Boost_INCLUDE_DIRS}
 )
 add_library (
     IrisRestfulLib OBJECT
@@ -150,6 +153,7 @@ if (IRIS_BUILD_SHARED)
         PRIVATE Threads::Threads
     )
     set(IrisRESTfulTargets ${IrisRESTfulTargets} IrisRestfulShared)
+    set_target_properties(IrisRestfulShared PROPERTIES OUTPUT_NAME "IrisRestful")
 endif()
 
 if (IRIS_BUILD_STATIC)
