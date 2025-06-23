@@ -35,4 +35,4 @@ jobs:
         with:
           file: ${{ github.workspace }}/Docker/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest # Tag the image with the repository name and 'latest'
+          tags: ghcr.io/${{ github.repository_owner }}/iris-restful:latest # Tag the image with the repository name and 'latest'
