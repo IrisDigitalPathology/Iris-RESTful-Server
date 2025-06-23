@@ -4,7 +4,7 @@ Copyright &copy; 2025 Iris Developers; MIT Software License
 
 The Iris RESTful server provides performance access to Iris encoded slide tile data for viewer implementations that use HTTP networking protocols. The server internally uses the [Boost Beast / ASIO]() library for networking protocols and the [Iris File Extension (IFE)]() library for slide tile access.
 
-This server is extremely light-weight, available as a 10 MB docker image, but can support >3000 slide tile requests per second with <35 ms median response times under that request load (tested with [Locust](https://locust.io) on a single Rockchip RK3588 [Turing RK1](https://turingpi.com/product/turing-rk1/?attribute_ram=8+GB) based server implementation).
+This server is extremely light-weight, available as a 16 MB docker image, but can support >3000 slide tile requests per second with <35 ms median response times under that request load (tested with [Locust](https://locust.io) on a single Rockchip RK3588 [Turing RK1](https://turingpi.com/product/turing-rk1/?attribute_ram=8+GB) based server implementation).
 
 A corresponding derived [OpenSeaDragon](https://openseadragon.github.io) TileSource, the [IrisTileSource](), has been developed to allow for JavaScript slide viewer applications to immediately begin taking advantage of the Iris File Extension slide format. 
 
@@ -30,9 +30,9 @@ GET <URL>/studies/<study>/series/<UID>/instances/<layer>/metadata
 GET <URL>/studies/<study>/series/<UID>/instances/<layer>/frames/<tile>
 ```
 ### Deployment Introduction
-Deploying an IrisRESTful Server is extremely simple. We recommend container deployment, but we describe the different methods for deploying a slide server in the [Deployment Section](README.md#deployment). The following is an out of the box deployment with `${SLIDES_DIRECTORY}` aliasing a directory that will be mounted to the container and contains the Iris slide files and `${CONNECTION_PORT}` describing the port that the container will use to listen. 
+Deploying an IrisRESTful Server is extremely simple. We recommend container deployment, but we describe the different methods for hosting a slide server in the [Deployment Section](README.md#deployment). The following is a one-line deployment with `${SLIDES_DIRECTORY}` aliasing a directory that will be mounted to the container and contains the Iris slide files and `${CONNECTION_PORT}` describing the port that the container will use to listen. 
 ```sh
-docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful
+docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest
 ```
 
 # API Explained
@@ -47,43 +47,42 @@ The specific API you plan to use will be indicated up front. Presently the API w
 
 
 ## Retrieve Metadata
-Metadata is returned in the form of a JSON object with the following structure
+Metadata is returned in the form of a JSON object with the structure shown in the below example.
 ```json
 {
-    "type": "iris_metadata",       // Confirm Slide Metadata
-    "format": "FORMAT_R8G8B8A8",    // Source byte format
-    "encoding": "image/jpeg",       // Tile Encoding Format
+    "type": "iris_metadata",      
+    "format": "FORMAT_R8G8B8A8",    
+    "encoding": "image/jpeg",      
     "extent": {
-        "width": 1983,              // Layer 0 window (pixels)
-        "height": 1381,             // Layer 0 window (pixels)
-        "layers": [                 // Array of layer extents
-            {                       // IFE 256 pixel tiles
-                "x_tiles": 8,       // Layer 0
+        "width": 1983,              
+        "height": 1381,             
+        "layers": [                 
+            {                       
+                "x_tiles": 8,      
                 "y_tiles": 6,
                 "scale": 1.0
             },
             {
-                "x_tiles": 31,      // Layer 1
+                "x_tiles": 31,      
                 "y_tiles": 22,
                 "scale": 4.0
             },
             {
-                "x_tiles": 124,     // Layer 2
+                "x_tiles": 124,     
                 "y_tiles": 87,
                 "scale": 16.0
             },
             {
-                "x_tiles": 496,     // Layer 3
+                "x_tiles": 496,     
                 "y_tiles": 346,
                 "scale": 64.0
             }
         ]
     },
-    "attributes" : {                // List of slie attributes
+    "attributes" : {                
         "aperio.ScannerType" : "GT450"
-        // Any additional attributes
     },
-    "associated_images": [          // List of non-tile images
+    "associated_images": [          
         "thumbnail",
         "tabel",
     ],

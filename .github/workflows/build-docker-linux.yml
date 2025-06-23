@@ -1,4 +1,4 @@
-name: Iris RESTful Server Linux Docker CI
+name: Iris RESTful Server Linux Docker Build
 
 on:
   workflow_call:
@@ -6,9 +6,9 @@ on:
         os: 
             required: true
             type: string
-        build_type:
+        push:
             required: true
-            type: string
+            type: boolean
 
 jobs:
   build:
@@ -31,5 +31,5 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           file: ${{ github.workspace }}/Docker/Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/iris-restful:latest # Tag the image with the repository name and 'latest'
+          push: ${{ inputs.push }}
+          tags: ghcr.io/${{ github.repository_owner }}/iris-restful:latest 

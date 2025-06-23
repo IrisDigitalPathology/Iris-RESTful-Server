@@ -30,6 +30,6 @@ jobs:
     uses: ./.github/workflows/build-docker-linux.yml
     with: 
       os: ${{ matrix.os }}
-      build_type: ${{ matrix.build_type }}
+      push: false
       
 

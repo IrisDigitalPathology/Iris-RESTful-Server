@@ -5,6 +5,7 @@
 //  Created by Ryan Landvater on 10/4/23.
 //
 #include <assert.h>
+#include <sstream>
 #include <iostream>
 #include "IrisTypes.hpp"
 #include "IrisQueue.hpp"

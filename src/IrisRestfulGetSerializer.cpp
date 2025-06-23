@@ -8,7 +8,7 @@
  * @copyright Copyright (c) 2025 Iris Developers
  * 
  */
-
+#include <sstream>
 #include <streambuf>
 #include "IrisRestfulPriv.hpp"
 
