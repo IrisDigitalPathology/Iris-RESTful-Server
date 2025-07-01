@@ -23,7 +23,7 @@ class __INTERNAL__Server {
     Networking                      _networking;
     Async::ThreadPool               _threads;
 public:
-    explicit __INTERNAL__Server     (const std::filesystem::path&);
+    explicit __INTERNAL__Server     (const ServerCreateInfo&);
     __INTERNAL__Server              (const __INTERNAL__Server&) = delete;
     __INTERNAL__Server& operator == (const __INTERNAL__Server&) = delete;
     void listen                     (uint16_t port);

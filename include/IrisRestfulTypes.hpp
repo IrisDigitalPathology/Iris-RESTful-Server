@@ -29,12 +29,13 @@ using Server                        = std::shared_ptr<class __INTERNAL__Server>;
 // We use these predefinitions internally to avoid long compile times
 using ASIOError_t                   = beast::error_code;
 using ASIOContext_t                 = net::io_context;
+using SSLContext_t                  = ssl::context;
 using ASIOGuard_t                   = net::executor_work_guard<net::io_context::executor_type>;
 using ASIOResolver_t                = ip::tcp::resolver;
 using ASIOEndpoint_t                = ip::tcp::endpoint;
 using ASIOAcceptor_t                = ip::tcp::acceptor;
 using ASIOSocket_t                  = ip::tcp::socket;
-using ASIOStream_t                  = beast::tcp_stream;
+using ASIOStream_t                  = ssl::stream<beast::tcp_stream>;
 using ASIOBuffer_t                  = beast::flat_buffer;
 using HTTPRequest_t                 = http::request<http::string_body>;
 using HTTPResponse_t                = http::response<http::string_body>;
@@ -43,6 +44,7 @@ using HTTPRequestParser_t           = http::request_parser<http::string_body>;
 #else
 class ASIOError_t;
 class ASIOContext_t;
+class SSLContext_t;
 class ASIOGuard_t;
 class ASIOResolver_t;
 class ASIOEndpoint_t;
@@ -61,6 +63,7 @@ class   __INTERNAL__Networking;
 struct  __INTERNAL__Session;
 class   __INTERNAL__Slide;
 using ASIOContext                   = std::shared_ptr<ASIOContext_t>;
+using SSLContext                    = std::shared_ptr<SSLContext_t>;
 using ASIOGuard                     = std::shared_ptr<ASIOGuard_t>;
 using ASIOResolver                  = std::shared_ptr<ASIOResolver_t>;
 using ASIOEndpoint                  = std::shared_ptr<ASIOEndpoint_t>;
@@ -74,8 +77,13 @@ using HTTPRequestParser             = std::shared_ptr<HTTPRequestParser_t>;
 using Networking                    = std::unique_ptr<__INTERNAL__Networking>;
 using Session                       = std::shared_ptr<__INTERNAL__Session>;
 using Slide                         = std::shared_ptr<__INTERNAL__Slide>;
-
 using SlideInfo                     = IrisCodec::SlideInfo;
+
+struct ServerCreateInfo {
+    std::filesystem::path slide_dir;
+    std::filesystem::path cert;
+    std::filesystem::path key;
+};
 struct GetRequest {
     enum Protocol {
         GET_REQUEST_MALFORMED       = 0,

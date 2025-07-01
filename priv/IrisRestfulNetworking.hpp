@@ -17,7 +17,7 @@ namespace RESTful {
 struct __INTERNAL__Session {
     const ASIOStream                    stream;
     RESTful::Slide                      slide = nullptr;
-    explicit __INTERNAL__Session        (ASIOSocket_t&&);
+    explicit __INTERNAL__Session        (ASIOSocket_t&&, SSLContext_t&);
     __INTERNAL__Session                 (const __INTERNAL__Session&) = delete;
     __INTERNAL__Session& operator ==    (const __INTERNAL__Session&) = delete;
    ~__INTERNAL__Session                 ();
@@ -25,13 +25,16 @@ struct __INTERNAL__Session {
 class __INTERNAL__Networking {
     const ServerCallbacks               _callbacks;
     const Threads                       _reactors;
-    const ASIOContext                   _context     = nullptr;
-    const ASIOGuard                     _guard       = nullptr;
-    ASIOAcceptor                        _acceptor    = nullptr;
+    const ASIOContext                   _context    = nullptr;
+    const ASIOGuard                     _guard      = nullptr;
+    const SSLContext                    _ssl        = nullptr;
+    ASIOAcceptor                        _acceptor   = nullptr;
     
     atomic_bool                         ACTIVE;
 public:
-    explicit __INTERNAL__Networking     (const ServerCallbacks&);
+    explicit __INTERNAL__Networking     (const ServerCallbacks&,
+                                         const std::filesystem::path& cert_file,
+                                         const std::filesystem::path& key_file);
     __INTERNAL__Networking              (const __INTERNAL__Networking&) = delete;
     __INTERNAL__Networking& operator == (const __INTERNAL__Networking&) = delete;
    ~__INTERNAL__Networking              ();

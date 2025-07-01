@@ -22,6 +22,7 @@ PROJECT (
 
 # Include the Boost libraries for ASIO support
 find_package(Boost REQUIRED CONFIG)
+find_package(OpenSSL REQUIRED)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Iris Core Headers Inclusion
@@ -92,6 +93,7 @@ set (
     ${SERVER_PRIV_DIR}/IrisAsync.cpp
     ${SERVER_SOURCE_DIR}/IrisRestfulGetParser.cpp
     ${SERVER_SOURCE_DIR}/IrisRestfulGetSerializer.cpp
+    ${SERVER_SOURCE_DIR}/IrisRestfulSSL.cpp
     ${SERVER_SOURCE_DIR}/IrisRestfulNetworking.cpp
     ${SERVER_SOURCE_DIR}/IrisRestfulServer.cpp
     ${SERVER_SOURCE_DIR}/IrisRestfulSlide.cpp
@@ -106,6 +108,12 @@ set (
     ${irisheaders_SOURCE_DIR}/include
     ${irisheaders_SOURCE_DIR}/priv
     ${Boost_INCLUDE_DIRS}
+)
+set (
+    ServerDependencies
+    Threads::Threads
+    OpenSSL::SSL 
+    OpenSSL::Crypto
 )
 add_library (
     IrisRestfulLib OBJECT
@@ -132,8 +140,7 @@ if (BUILD_SERVER)
         $<TARGET_OBJECTS:IrisRestfulLib>
     )
     target_link_libraries(
-        IrisRESTful
-        PRIVATE Threads::Threads
+        IrisRESTful PRIVATE ${ServerDependencies}
     )
     target_include_directories (
         IrisRESTful PRIVATE
@@ -149,8 +156,7 @@ if (IRIS_BUILD_SHARED)
         $<TARGET_OBJECTS:IrisRestfulLib>
     )
     target_link_libraries(
-        IrisRestfulShared
-        PRIVATE Threads::Threads
+        IrisRestfulShared PRIVATE ${ServerDependencies}
     )
     set(IrisRESTfulTargets ${IrisRESTfulTargets} IrisRestfulShared)
     set_target_properties(IrisRestfulShared PROPERTIES OUTPUT_NAME "IrisRestful")
@@ -163,8 +169,7 @@ if (IRIS_BUILD_STATIC)
         $<TARGET_OBJECTS:IrisRestfulLib>
     )
     target_link_libraries(
-        IrisRestfulStatic
-        PRIVATE Threads::Threads
+        IrisRestfulStatic PRIVATE ${ServerDependencies}
     )
     set(IrisRESTfulTargets ${IrisRESTfulTargets} IrisRestfulStatic)
 endif(IRIS_BUILD_STATIC)

@@ -9,24 +9,51 @@
  * 
  */
 #include "IrisRestfulPriv.hpp"
-Iris::RESTful::Server Iris::RESTful::create_server(const std::filesystem::path& root)
+Iris::RESTful::Server Iris::RESTful::create_server(const ServerCreateInfo& info)
 {
-    // Format the path string
-    auto mut_path = std::filesystem::path(root).make_preferred();
-    if (mut_path.string().back() != std::filesystem::path::preferred_separator)
-        mut_path+=std::filesystem::path::preferred_separator;
+    ServerCreateInfo mut_info = info;
     
-    // Ensure the directory containing the slide files exists
-    if (std::filesystem::is_directory(mut_path) == false) {
-        std::cerr   << "ERROR: file system reports the provided slide root directory ("
-                    << mut_path
+    // Format the path string
+    mut_info.slide_dir.make_preferred();
+    if (mut_info.slide_dir.string().back() != std::filesystem::path::preferred_separator)
+        mut_info.slide_dir+=std::filesystem::path::preferred_separator;
+    
+    if (std::filesystem::is_directory(mut_info.slide_dir) == false) {
+        std::cerr   << "[ERROR] File system reports the provided slide root directory ("
+                    << info.slide_dir
                     << ") does not exist\n";
         return nullptr;
     }
     
+    if (!mut_info.cert.empty()) {
+        mut_info.cert.make_preferred();
+        if (std::filesystem::exists(mut_info.cert) == false) {
+            std::cerr   << "[ERROR] File system reports the provided certificate ("
+                        << mut_info.cert
+                        << ") does not exist\n";
+            return nullptr;
+        }
+    }
+    
+    if (!mut_info.key.empty()) {
+        mut_info.key.make_preferred();
+        if (std::filesystem::exists(mut_info.key) == false) {
+            std::cerr   << "[ERROR] File system reports the provided key ("
+                        << mut_info.key
+                        << ") does not exist\n";
+        }
+    }
+    
     // Create a server instance
-    return std::make_shared<__INTERNAL__Server>(mut_path);
+    try { return std::make_shared<__INTERNAL__Server>(mut_info); }
+    catch (std::runtime_error& error) {
+        std::cerr   << "Failed to create server instance: "
+                    << error.what() << "\n";
+        return NULL;
+    }
+    
 }
+
 Iris::Result Iris::RESTful::server_listen(const Server& server, uint16_t port)
 {
     try {
@@ -47,11 +74,11 @@ Iris::Result Iris::RESTful::server_listen(const Server& server, uint16_t port)
 namespace Iris {
 namespace RESTful {
 using namespace std::placeholders;
-__INTERNAL__Server::__INTERNAL__Server(const std::filesystem::path &root) :
-_root(root),
+__INTERNAL__Server::__INTERNAL__Server(const ServerCreateInfo& info) :
+_root(info.slide_dir),
 _networking(std::make_unique<__INTERNAL__Networking>(ServerCallbacks {
     .onGetRequest = std::bind(&__INTERNAL__Server::on_get_request, this, _1, _2, _3),
-})),
+}, info.cert, info.key)),
 _threads(Async::createThreadPool())
 {
     

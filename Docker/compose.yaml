@@ -11,5 +11,7 @@ services:
     restart: always
     volumes:
       - slides:/slides
+      - certs:/ect/ssl/
 volumes:
   slides:
+  certs:

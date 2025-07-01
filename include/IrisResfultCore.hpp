@@ -17,14 +17,15 @@ namespace RESTful {
 /**
  * @brief Create a server object
  * 
- * @param root_slide_dir 
- * @return Server 
+ * @param info Create info structure detailing the directory containing the Iris slide files
+ * and the directory containing the SSL certs and keys for the secure socket layer (HTTPS)
+ * @return Server
  */
-Server create_server (const std::filesystem::path& root_slide_dir);
+Server create_server (const ServerCreateInfo& info);
 /**
  * @brief Instruct the server to begin listening at the provided port
  * 
- * @param port 
+ * @param port port number to begin listening on
  * @return Result flag indicating success or failure
  */
 Result server_listen (const Server&, uint16_t port);

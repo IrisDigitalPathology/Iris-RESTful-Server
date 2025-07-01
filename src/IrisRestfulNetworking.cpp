@@ -15,6 +15,7 @@
 #endif // __clang__
 #include <boost/beast.hpp>          // Beast websocket protocol
 #include <boost/asio/strand.hpp>    // Asio strand-style execution
+#include <boost/asio/ssl.hpp>       // Asio openssl interface
 #include <boost/exception/all.hpp>  // Boost runtime exceptions
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -23,6 +24,7 @@
 #define BOOST_IMPLEMENT // Allow for class definitions 
 namespace   net       = boost::asio;
 namespace   beast     = boost::beast;
+namespace   ssl       = net::ssl;
 namespace   ip        = net::ip;
 using       tcp       = ip::tcp;
 namespace   http      = beast::http;
@@ -30,22 +32,34 @@ namespace   http      = beast::http;
 
 namespace Iris {
 namespace RESTful {
-__INTERNAL__Session::__INTERNAL__Session(ASIOSocket_t&& socket) :
-stream(std::make_unique<ASIOStream_t>(std::move(socket)))
+
+// Forward declare SSL context creation. See IrisRestfulSSL.cpp
+using fs_path = std::filesystem::path;
+std::shared_ptr<boost::asio::ssl::context> CREATE_SSL_CONTEXT
+ (const fs_path& cert_path, const fs_path& key_path);
+
+// Define Session
+__INTERNAL__Session::__INTERNAL__Session(ASIOSocket_t&& socket, SSLContext_t& ctx) :
+stream(std::make_unique<ASIOStream_t>(std::move(socket), ctx))
 {
     std::cout <<"NEW SESSION\n";
 }
 __INTERNAL__Session::~__INTERNAL__Session() {
     std::cout <<"SESSION EXPIRED\n";
 }
-__INTERNAL__Networking::__INTERNAL__Networking(const ServerCallbacks& callbacks) :
-_callbacks  (callbacks),
+
+// Define Networking hub
+__INTERNAL__Networking::__INTERNAL__Networking (const ServerCallbacks &cb, const fs_path& cert, const fs_path& key) :
+_callbacks  (cb),
 _reactors   (IRIS_CONCURRENCY),
 _context    (std::make_shared<ASIOContext_t>(_reactors.size())),
 _guard      (std::make_shared<ASIOGuard_t>(_context->get_executor())),
+_ssl        (CREATE_SSL_CONTEXT(cert, key)),
 _acceptor   (nullptr),
 ACTIVE      (true)
 {
+    if (!_ssl) throw std::runtime_error ("Failed to create SSL context");
+    
     for (auto&& thread : const_cast<Threads&>(_reactors))
         thread = std::thread {[this](){
             // Run the context run loop within
@@ -140,15 +154,24 @@ void __INTERNAL__Networking::accept_connection(const ASIOAcceptor &acceptor)
         if (acceptor->is_open()) accept_connection (acceptor);
         
         // Create a stream and begin reading messages
-        auto session = std::make_shared<__INTERNAL__Session>(std::move(socket));
-        read_request (session);
+        auto session = std::make_shared<__INTERNAL__Session>(std::move(socket), *_ssl);
+        beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
+        (*session->stream).async_handshake(ssl::stream_base::server,[this,session]
+                                           (beast::error_code error){
+            if (error) {
+                std::cerr << error.what() << "\n";
+            } else {
+                read_request (session);
+            }
+               
+        });
     });
 }
 void __INTERNAL__Networking::read_request(const Session &session)
 {
     // Extend the expiration time
     // This is ABSOLUTELY VITAL. Failure to do this will signficantly affect performance
-    session->stream->expires_after(std::chrono::seconds(30));
+    beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
     
     auto buffer  = std::make_shared<ASIOBuffer_t>();
     auto parser  = std::make_shared<http::request_parser<http::string_body>>();
@@ -156,8 +179,8 @@ void __INTERNAL__Networking::read_request(const Session &session)
     parser->header_limit(1024);
     parser->body_limit(2048);
     
-//    http::async_read(*(session->stream), *buffer, *request,[this, session, buffer, request]
-    http::async_read(*(session->stream), *buffer, *parser,[this, session, buffer, parser]
+    http::async_read(*session->stream, *buffer, *parser,
+                     [this, session, buffer, parser]
                      (beast::error_code error, size_t bytes_transferred) {
         if (error) {
             if(error == http::error::end_of_stream ||
@@ -190,40 +213,9 @@ void __INTERNAL__Networking::read_request(const Session &session)
         interpret_request(session, HTTPRequest_t(parser->release()));
     });
 }
-// Return a reasonable mime type based on the extension of a file.
-inline beast::string_view
-mime_type(beast::string_view path)
+inline bool IS_STREAM_OPEN (const ASIOStream &stream)
 {
-    using beast::iequals;
-    auto const ext = [&path]
-    {
-        auto const pos = path.rfind(".");
-        if(pos == beast::string_view::npos)
-            return beast::string_view{};
-        return path.substr(pos);
-    }();
-    if(iequals(ext, ".htm"))  return "text/html";
-    if(iequals(ext, ".html")) return "text/html";
-    if(iequals(ext, ".php"))  return "text/html";
-    if(iequals(ext, ".css"))  return "text/css";
-    if(iequals(ext, ".txt"))  return "text/plain";
-    if(iequals(ext, ".js"))   return "application/javascript";
-    if(iequals(ext, ".json")) return "application/json";
-    if(iequals(ext, ".xml"))  return "application/xml";
-    if(iequals(ext, ".swf"))  return "application/x-shockwave-flash";
-    if(iequals(ext, ".flv"))  return "video/x-flv";
-    if(iequals(ext, ".png"))  return "image/png";
-    if(iequals(ext, ".jpe"))  return "image/jpeg";
-    if(iequals(ext, ".jpeg")) return "image/jpeg";
-    if(iequals(ext, ".jpg"))  return "image/jpeg";
-    if(iequals(ext, ".gif"))  return "image/gif";
-    if(iequals(ext, ".bmp"))  return "image/bmp";
-    if(iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
-    if(iequals(ext, ".tiff")) return "image/tiff";
-    if(iequals(ext, ".tif"))  return "image/tiff";
-    if(iequals(ext, ".svg"))  return "image/svg+xml";
-    if(iequals(ext, ".svgz")) return "image/svg+xml";
-    return "application/text";
+    return stream->lowest_layer().is_open();
 }
 inline HTTPResponse GENERATE_STRING_GET_RESPONSE (const GetResponse &response) {
     HTTPResponse msg = std::make_shared<HTTPResponse_t>();
@@ -265,6 +257,8 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
     // Do not fuck with this design if you don't know what I'm talking about or without asking me.
     // - Ryan
     switch (request.method()) {
+            
+        // RESTful GET request
         case boost::beast::http::verb::head:
         case boost::beast::http::verb::get:
             _callbacks.onGetRequest(session, std::string(request.target()),[this,session, keep_alive]
@@ -297,9 +291,17 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
                     }
                 }
             }); return;
+        
+        // RESTful POST request
         case http::verb::post:
+        
+        // RESTFUL PUT request
         case http::verb::put:
+            
+        // RESTFUL PATCH request
         case http::verb::patch:
+            
+        // RESTFUL DELETE request
         case http::verb::delete_:
         case http::verb::options:
         default: {
@@ -312,11 +314,12 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
 }
 void __INTERNAL__Networking::send_response(const Session &session, const HTTPResponse &response)
 {
-    http::async_write(*(session->stream), *response, [this, session, response]
+    http::async_write(*session->stream, *response,
+                      [this, session, response]
                       (beast::error_code error, size_t bytes_transferred) {
         if (error) std::cout    << "Error writing response to stream: "
                                 << error.message();
-        if (response->keep_alive() && session->stream->socket().is_open())
+        if (response->keep_alive() && IS_STREAM_OPEN(session->stream))
                 read_request (session);
         else    close_stream (session);
     });
@@ -324,21 +327,28 @@ void __INTERNAL__Networking::send_response(const Session &session, const HTTPRes
 void __INTERNAL__Networking::send_buffer(const Session &session, const HTTPResponseBuffer &response, const Buffer &buffer)
 {
     auto serializer = std::make_shared<http::serializer<false, http::buffer_body>> (*response);
-    
-//    write_some(buffer, response, serializer, session);
-    http::async_write(*(session->stream), *response, [this, session, response, buffer]
+
+    http::async_write(*session->stream, *response,
+                      [this, session, response, buffer]
                       (beast::error_code error, size_t bytes_transferred) {
         if (error) std::cout    << "Error writing response to stream: "
                                 << error.message();
-        if (response->keep_alive() && session->stream->socket().is_open())
+        if (response->keep_alive() && IS_STREAM_OPEN(session->stream))
                 read_request (session);
         else    close_stream (session);
     });
 }
 void __INTERNAL__Networking::close_stream(const Session &session)
 {
+    beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
     beast::error_code error;
-    session->stream->socket().shutdown(tcp::socket::shutdown_send, error);
+    if (beast::get_lowest_layer(*session->stream).socket().is_open())
+        (*session->stream).shutdown(error);
+    if (error == net::ssl::error::stream_truncated) return;
+//    if (error == net::error::broken_pipe) return;
+    if (error) std::cout    << "Error in closing the stream"
+                            << error.message();
+    
 }
 } // END RESTFUL
 } // END IRIS

@@ -1,4 +1,4 @@
-name: Iris RESTful Server Linux Docker CI
+name: Deploy Iris RESTful Server Linux Docker
 
 on:
   release:

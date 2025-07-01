@@ -1,10 +1,13 @@
 # syntax=docker/dockerfile:1
 
+# Run 'docker build -f Docker/Dockerfile -t iris-restful-server:latest .' from the root of the repository to build the image.
+# See https://docs.docker.com/engine/reference/builder/ for more information on the Dockerfile syntax.
+
 FROM alpine:3.22.0 AS base
 
 FROM base AS build_env
 WORKDIR /server_build/
-RUN apk update && apk upgrade && apk add clang ninja cmake git boost-dev
+RUN apk update && apk upgrade && apk add clang ninja cmake git boost-dev openssl-dev
 
 COPY . .
 RUN cmake -G Ninja -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DIRIS_BUILD_SHARED=OFF -DIRIS_BUILD_STATIC=OFF &&\
@@ -33,4 +36,5 @@ LABEL org.opencontainers.image.source=https://github.com/IrisDigitalPathology/Ir
 LABEL org.opencontainers.image.description="Iris File Extension RESTful API Server"
 LABEL org.opencontainers.image.licenses=MIT
 
-ENTRYPOINT [ "IrisRESTful", "3000", "/slides" ]
+ENTRYPOINT [ "IrisRESTful"]
+CMD ["-p", "3000", "-d", "/slides"]
