@@ -10,6 +10,7 @@
  */
 
 #include <cstring>
+#include <charconv>
 #include "IrisRestfulPriv.hpp"
 
 namespace Iris {
