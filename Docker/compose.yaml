@@ -2,10 +2,7 @@
 
 services:
   iris-restful:
-    build:
-      context: ../
-      dockerfile: ./Docker/Dockerfile
-      target: deploy
+    image: ghcr.io/ryanlandvater/iris-restful:latest
     ports:
       - 3000:3000
     restart: always

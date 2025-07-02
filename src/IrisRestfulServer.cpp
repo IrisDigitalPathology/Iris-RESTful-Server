@@ -78,7 +78,7 @@ __INTERNAL__Server::__INTERNAL__Server(const ServerCreateInfo& info) :
 _root(info.slide_dir),
 _networking(std::make_unique<__INTERNAL__Networking>(ServerCallbacks {
     .onGetRequest = std::bind(&__INTERNAL__Server::on_get_request, this, _1, _2, _3),
-}, info.cert, info.key)),
+}, info.cert, info.key, "*")),
 _threads(Async::createThreadPool())
 {
     

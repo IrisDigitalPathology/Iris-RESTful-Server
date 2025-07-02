@@ -28,13 +28,15 @@ class __INTERNAL__Networking {
     const ASIOContext                   _context    = nullptr;
     const ASIOGuard                     _guard      = nullptr;
     const SSLContext                    _ssl        = nullptr;
+    const Address                       _CORS       = "*";
     ASIOAcceptor                        _acceptor   = nullptr;
     
     atomic_bool                         ACTIVE;
 public:
     explicit __INTERNAL__Networking     (const ServerCallbacks&,
                                          const std::filesystem::path& cert_file,
-                                         const std::filesystem::path& key_file);
+                                         const std::filesystem::path& key_file,
+                                         const Address& CORS);
     __INTERNAL__Networking              (const __INTERNAL__Networking&) = delete;
     __INTERNAL__Networking& operator == (const __INTERNAL__Networking&) = delete;
    ~__INTERNAL__Networking              ();

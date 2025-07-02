@@ -49,12 +49,16 @@ __INTERNAL__Session::~__INTERNAL__Session() {
 }
 
 // Define Networking hub
-__INTERNAL__Networking::__INTERNAL__Networking (const ServerCallbacks &cb, const fs_path& cert, const fs_path& key) :
+__INTERNAL__Networking::__INTERNAL__Networking (const ServerCallbacks &cb,
+                                                const fs_path& cert,
+                                                const fs_path& key,
+                                                const Address& CORS) :
 _callbacks  (cb),
 _reactors   (IRIS_CONCURRENCY),
 _context    (std::make_shared<ASIOContext_t>(_reactors.size())),
 _guard      (std::make_shared<ASIOGuard_t>(_context->get_executor())),
 _ssl        (CREATE_SSL_CONTEXT(cert, key)),
+_CORS       (CORS),
 _acceptor   (nullptr),
 ACTIVE      (true)
 {
@@ -133,6 +137,10 @@ void __INTERNAL__Networking::listen(uint16_t port){
     if (error) throw std::runtime_error
         ("Failed to listen with acceptor: " + error.message() +
          "[FILE " + __FILE__ + "; LINE " + std::to_string(__LINE__) + "]");
+    
+    // Report out to the console the local endpoint
+    std::cout   << "[NOTE] Iris RESTful server is now listening at "
+                << _acceptor->local_endpoint() << "\n";
 
     accept_connection(_acceptor);
 }
@@ -217,7 +225,8 @@ inline bool IS_STREAM_OPEN (const ASIOStream &stream)
 {
     return stream->lowest_layer().is_open();
 }
-inline HTTPResponse GENERATE_STRING_GET_RESPONSE (const GetResponse &response) {
+inline HTTPResponse GENERATE_STRING_GET_RESPONSE (const GetResponse &response,
+                                                  const Address& CORS) {
     HTTPResponse msg = std::make_shared<HTTPResponse_t>();
     switch (response.type) {
         case GetResponse::GET_RESPONSE_UNDEFINED:
@@ -239,6 +248,7 @@ inline HTTPResponse GENERATE_STRING_GET_RESPONSE (const GetResponse &response) {
     }
     msg->version(11);
     msg->set(http::field::server, "IrisRESTful");
+    msg->set("Access-Control-Allow-Origin", CORS);
     msg->keep_alive(response.keep_alive);
     msg->body() = serialize_get_response(response);
     msg->prepare_payload();
@@ -270,7 +280,7 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
                     case GetResponse::GET_RESPONSE_MALFORMED_REQ:
                     case GetResponse::GET_RESPONSE_FILE_NOT_FOUND:
                     case GetResponse::GET_RESPONSE_METADATA:
-                        return send_response(session, GENERATE_STRING_GET_RESPONSE(*response));
+                        return send_response(session, GENERATE_STRING_GET_RESPONSE(*response,_CORS));
                     case GetResponse::GET_RESPONSE_TILE:
                     {
                         HTTPResponseBuffer msg  = std::make_shared<HTTPResponseBuffer_t>();
@@ -279,13 +289,13 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
                         msg->result(http::status::ok);
                         msg->set(http::field::server, "IrisRESTful");
                         msg->set(http::field::content_type, "image/jpeg");
-//                        msg->content_length(tile_response->pixelData->size());
+                        msg->set("Access-Control-Allow-Origin", _CORS);
+                        
                         msg->body().data        = tile_response->pixelData->data();
                         msg->body().size        = tile_response->pixelData->size();
                         msg->body().more        = false;
                         msg->keep_alive(keep_alive);
                         msg->prepare_payload();
-//                        msg->prepare_payload();
                         send_buffer(session, msg, tile_response->pixelData);
                         return;
                     }

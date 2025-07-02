@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Run 'docker build -f Docker/Dockerfile -t iris-restful-server:latest .' from the root of the repository to build the image.
+# Run 'docker build -f Docker/Dockerfile -t iris-restful:latest .' from the root of the repository to build the image.
 # See https://docs.docker.com/engine/reference/builder/ for more information on the Dockerfile syntax.
 
 FROM alpine:3.22.0 AS base

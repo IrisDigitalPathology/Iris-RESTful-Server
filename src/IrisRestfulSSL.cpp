@@ -241,17 +241,17 @@ std::shared_ptr<boost::asio::ssl::context> CREATE_SSL_CONTEXT (const std::filesy
     ctx->use_certificate_chain (boost::asio::buffer(cert->data(),cert->size()));
     ctx->use_private_key (boost::asio::buffer(key->data(), key->size()),
                           boost::asio::ssl::context::file_format::pem);
-//    switch (bits) {
-//        case 1024: ctx->use_tmp_dh (boost::asio::buffer(g_dh1024_sz)); break;
-//        case 1536: ctx->use_tmp_dh (boost::asio::buffer(g_dh1536_sz)); break;
-//        case 2048: ctx->use_tmp_dh (boost::asio::buffer(g_dh2048_sz)); break;
-//        case 3072: ctx->use_tmp_dh (boost::asio::buffer(g_dh3072_sz)); break;
-//        case 4096: ctx->use_tmp_dh (boost::asio::buffer(g_dh4096_sz)); break;
-//        default:
-//            std::cerr   << "[WARNING] This server will NOT use DH parameters and will be much less secure. "
-//            << "This is because the key length is unsupported (" << bits <<" bits). Iris RESTful currently only "
-//            << "supports 1024, 1536, 2048, 3072, and 4096 bit ciphers for Diffie-Hellman key agreement protocols.\n";
-//    }
+    switch (bits) {
+        case 1024: ctx->use_tmp_dh (boost::asio::buffer(g_dh1024_sz)); break;
+        case 1536: ctx->use_tmp_dh (boost::asio::buffer(g_dh1536_sz)); break;
+        case 2048: ctx->use_tmp_dh (boost::asio::buffer(g_dh2048_sz)); break;
+        case 3072: ctx->use_tmp_dh (boost::asio::buffer(g_dh3072_sz)); break;
+        case 4096: ctx->use_tmp_dh (boost::asio::buffer(g_dh4096_sz)); break;
+        default:
+            std::cerr   << "[WARNING] This server will NOT use DH parameters and will be much less secure. "
+            << "This is because the key length is unsupported (" << bits <<" bits). Iris RESTful currently only "
+            << "supports 1024, 1536, 2048, 3072, and 4096 bit ciphers for Diffie-Hellman key agreement protocols.\n";
+    }
     
     // Return the newly constructed SSL Context
     return ctx;
