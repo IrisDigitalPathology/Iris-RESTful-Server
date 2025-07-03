@@ -86,6 +86,7 @@ std::string serialize_get_response (const GetResponse& response)
             "Undefined GET request error. IrisRESTful server did elaborate on what happened.";
         case GetResponse::GET_RESPONSE_METADATA:
             return SERIALIZE_SLIDE_METADATA_JSON(response);
+        case GetResponse::GET_RESPONSE_FILE:
         case GetResponse::GET_RESPONSE_TILE:
             assert(false && "ERROR: cannot perform serialize_get_response on GET_RESPONSE_TILE response; this is a binary response");
             throw std::runtime_error("ERROR: cannot serialize_get_response a GET_RESPONSE_TILE response; this is a binary response");

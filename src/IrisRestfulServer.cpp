@@ -75,8 +75,9 @@ namespace Iris {
 namespace RESTful {
 using namespace std::placeholders;
 __INTERNAL__Server::__INTERNAL__Server(const ServerCreateInfo& info) :
-_root(info.slide_dir),
-_networking(std::make_unique<__INTERNAL__Networking>(ServerCallbacks {
+_root       (info.slide_dir),
+_doc_root   (info.doc_root),
+_networking (std::make_unique<__INTERNAL__Networking>(ServerCallbacks {
     .onGetRequest = std::bind(&__INTERNAL__Server::on_get_request, this, _1, _2, _3),
 }, info.cert, info.key, "*")),
 _threads(Async::createThreadPool())
@@ -86,6 +87,26 @@ _threads(Async::createThreadPool())
 void __INTERNAL__Server::listen(uint16_t port)
 {
     _networking->listen(port);
+}
+inline std::unique_ptr<GetResponse> PROCESS_GET_FILE_REQUEST (const std::unique_ptr<GetRequest> &_r, const std::filesystem::path& doc_root)
+{
+    assert(_r->protocol == GetRequest::GET_REQUEST_FILE && "PROCESS_GET_FILE_REQUEST attempting to interpret GetRequest of invalid type (not GetRequest::GET_REQUEST_FILE)");
+    assert(doc_root.empty() == false && "PROCESS_GET_FILE_REQUEST attempting to file serve non-web-server configured Iris RESTful.");
+    
+    const auto& request     = *reinterpret_cast<GetFileRequest*>(_r.get());
+    auto response           = std::make_unique<GetFileResponse>();
+    try {
+        auto path = std::filesystem::path(doc_root.string() + request.path).make_preferred();
+        if (std::filesystem::exists(path) == false) throw std::runtime_error
+            ("File '" + request.path + "' not found");
+        response->type      = GetResponse::GET_RESPONSE_FILE;
+        response->address   = path;
+        response->mime      = request.mime;
+    } catch (std::runtime_error& e) {
+        response->type      = GetResponse::GET_RESPONSE_FILE_NOT_FOUND;
+        response->error_msg = e.what();
+    }
+    return response;
 }
 inline std::unique_ptr<GetResponse> PROCESS_GET_TILE_REQUEST (const std::unique_ptr<GetRequest> &_r, const Slide &slide)
 {
@@ -109,7 +130,12 @@ inline std::unique_ptr<GetResponse> PROCESS_GET_METATADATA_REQUEST (const std::u
     assert(_r->type == GetRequest::GET_REQUEST_METADATA && "PROCESS_GET_METATADATA_REQUEST attempting to interpret GetRequest of invalid type (not GetRequest::GET_REQUEST_METADATA)");
     assert(slide && "PROCESS_GET_METATADATA_REQUEST attempting to interpret GetRequest with invalid slide handle.");
     
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wunused"
+    // Ignore for now. May need it later...
     const auto& request = *reinterpret_cast<GetMetadataRequest*>(_r.get());
+    #pragma clang diagnostic pop
+    
     auto response       = std::make_unique<GetMetadataResponse>();
     try {
         if (!slide) throw std::runtime_error ("No valid slide file found");
@@ -194,9 +220,24 @@ void __INTERNAL__Server::on_get_request(const Session& session,
         
         // Ensure it follows a supported RESTful API
         //  -- Currently that's IrisRESTful and WADO-RS
+        //  -- OPTIONALLY that includes a webserver / file server
         switch (request->protocol) {
+            // Are we attempting to use Iris RESTFUL as a webserver as well
+            // to avoid Cross Origin serving?
+            case GetRequest::GET_REQUEST_FILE:
+                if(_doc_root.empty()) {
+                    response->type = GetMetadataResponse::GET_RESPONSE_FILE_NOT_FOUND;
+                    response->error_msg =
+                    "This Iris RESTful implementation is not configured to run as a web server / file server.";
+                    return on_response(response);
+                } else {
+                    return on_response(PROCESS_GET_FILE_REQUEST(request, _doc_root));
+                }
+                
+            // Standard IRIS or DICOM Requests
             case GetRequest::GET_REQUEST_IRIS:  break;
             case GetRequest::GET_REQUEST_DICOM: break;
+            
             case GetRequest::GET_REQUEST_MALFORMED:
             default: goto MALFORMED_REQUEST;
         }

@@ -16,6 +16,7 @@ namespace RESTful {
 
 class __INTERNAL__Server {
     const std::filesystem::path     _root;
+    const std::filesystem::path     _doc_root;
     struct : public std::unordered_map<std::string,
     std::weak_ptr<__INTERNAL__Slide>> {
         SharedMutex                 mutex;

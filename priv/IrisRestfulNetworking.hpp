@@ -16,6 +16,7 @@ namespace Iris {
 namespace RESTful {
 struct __INTERNAL__Session {
     const ASIOStream                    stream;
+    const std::string                   remote;
     RESTful::Slide                      slide = nullptr;
     explicit __INTERNAL__Session        (ASIOSocket_t&&, SSLContext_t&);
     __INTERNAL__Session                 (const __INTERNAL__Session&) = delete;
@@ -48,6 +49,7 @@ private:
     void interpret_request              (const Session&, const HTTPRequest_t&);
     void send_response                  (const Session&, const HTTPResponse&);
     void send_buffer                    (const Session&, const HTTPResponseBuffer&, const Buffer&);
+    void send_file                      (const Session&, const HTTPResponseFile&);
     void close_stream                   (const Session&);
 };
 } // END RESTUFL

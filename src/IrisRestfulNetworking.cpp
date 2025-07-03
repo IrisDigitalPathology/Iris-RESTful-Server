@@ -39,8 +39,12 @@ std::shared_ptr<boost::asio::ssl::context> CREATE_SSL_CONTEXT
  (const fs_path& cert_path, const fs_path& key_path);
 
 // Define Session
+inline std::string ADDRESS_TO_STRING (const tcp::endpoint& endpoint) {
+    return endpoint.address().to_string()+":"+std::to_string(endpoint.port());
+}
 __INTERNAL__Session::__INTERNAL__Session(ASIOSocket_t&& socket, SSLContext_t& ctx) :
-stream(std::make_unique<ASIOStream_t>(std::move(socket), ctx))
+stream(std::make_unique<ASIOStream_t>(std::move(socket), ctx)),
+remote(ADDRESS_TO_STRING(stream->lowest_layer().remote_endpoint()))
 {
     std::cout <<"NEW SESSION\n";
 }
@@ -167,7 +171,9 @@ void __INTERNAL__Networking::accept_connection(const ASIOAcceptor &acceptor)
         (*session->stream).async_handshake(ssl::stream_base::server,[this,session]
                                            (beast::error_code error){
             if (error) {
-                std::cerr << error.what() << "\n";
+                std::cerr   << "["<<session->stream->lowest_layer().remote_endpoint()<<"]"
+                            << "Error in performing SSL handshake: "
+                            << error.what() << "\n";
             } else {
                 read_request (session);
             }
@@ -221,12 +227,7 @@ void __INTERNAL__Networking::read_request(const Session &session)
         interpret_request(session, HTTPRequest_t(parser->release()));
     });
 }
-inline bool IS_STREAM_OPEN (const ASIOStream &stream)
-{
-    return stream->lowest_layer().is_open();
-}
-inline HTTPResponse GENERATE_STRING_GET_RESPONSE (const GetResponse &response,
-                                                  const Address& CORS) {
+inline HTTPResponse GENERATE_STRING_GET_RESPONSE (const GetResponse &response) {
     HTTPResponse msg = std::make_shared<HTTPResponse_t>();
     switch (response.type) {
         case GetResponse::GET_RESPONSE_UNDEFINED:
@@ -242,63 +243,101 @@ inline HTTPResponse GENERATE_STRING_GET_RESPONSE (const GetResponse &response,
             msg->result(http::status::ok);
             msg->set(http::field::content_type, "application/json");
             break;
+        case GetResponse::GET_RESPONSE_FILE:
         case GetResponse::GET_RESPONSE_TILE:
-            assert(false && "ERROR: cannot generate http::string_body for GET_RESPONSE_TILE response; this is a binary response");
-            throw std::runtime_error ("ERROR: cannot generate http::string_body for GET_RESPONSE_TILE response; this is a binary response");
+            goto MALFORMATTED_RESPONSE;
     }
-    msg->version(11);
-    msg->set(http::field::server, "IrisRESTful");
-    msg->set("Access-Control-Allow-Origin", CORS);
-    msg->keep_alive(response.keep_alive);
     msg->body() = serialize_get_response(response);
-    msg->prepare_payload();
     return msg;
+    
+    MALFORMATTED_RESPONSE:
+    std::stringstream error;
+    error   << "[ERROR] Cannot generate http::string_body for non-string response."
+            <<" Set a breakpoint in " << __FILE__ << " line no " << __LINE__ << "to debug.";
+    assert (false && error.str().c_str());
+    throw std::runtime_error(error.str());
+}
+inline HTTPResponseFile GENERATE_FILE_RESPONSE (const GetFileResponse& file_response)
+{
+    beast::error_code ec;
+    HTTPResponseFile msg  = std::make_shared<HTTPResponseFile_t>();
+    msg->result(http::status::ok);
+    msg->set(http::field::content_type, file_response.mime);
+    msg->body().open(file_response.address.c_str(), beast::file_mode::read, ec);
+    if (ec) {
+        std::stringstream error;
+        error   << "[ERROR] Cannot generate http::file_body response: " << ec.what() << ". "
+                << "Set a breakpoint in " << __FILE__ << " line no " << __LINE__ << "to debug.";
+        assert(false && error.str().c_str());
+        throw std::runtime_error(ec.what());
+    }
+    return msg;
+}
+inline HTTPResponseBuffer GENERATE_TILE_RESPONSE (const GetTileResponse &tile_response)
+{
+    HTTPResponseBuffer msg  = std::make_shared<HTTPResponseBuffer_t>();
+    msg->result(http::status::ok);
+    msg->set(http::field::content_type, "image/jpeg");
+    msg->body().data        = tile_response.pixelData->data();
+    msg->body().size        = tile_response.pixelData->size();
+    msg->body().more        = false;
+    return msg;
+}
+// Generic Formatter Function. Applies generic server information to finalize response payloads.
+template <class T>
+inline void FORMAT_RESPONSE (http::response<T>& response, const HTTPRequest_t &request, const Address& CORS) {
+    response.version(request.version());
+    response.set(http::field::server, "Iris RESTful Server");
+    if (CORS.length()) response.set("Access-Control-Allow-Origin", CORS);
+    response.keep_alive(request.keep_alive());
+    response.prepare_payload();
 }
 void __INTERNAL__Networking::interpret_request(const Session& session, const HTTPRequest_t &request)
 {
-    bool keep_alive = request.keep_alive();
-    
-    // TODO: Should we add file support here (JS/HTML etc...)
-
     // The _callbacks.on_X_Request callbacks use a nested callback for a VERY good reason.
     // This allows the __INTERNAL__Server instance to push the implementation off the stack
     // to a separate worker thread and remove it from this ASIO/NetowrkingTS reactor thread.
-    // I want to allow the ASIO threads to dedicate all clock cycles to clearing the network queue.
-    // Do not fuck with this design if you don't know what I'm talking about or without asking me.
+    // I want to allow the ASIO threads to only work on the network queue.
+    // The server request implementation functions on a completely disconnected stack / queue.
+    // Do not mess with this design if you don't know what I'm talking about or without asking me.
     // - Ryan
     switch (request.method()) {
             
         // RESTful GET request
         case boost::beast::http::verb::head:
         case boost::beast::http::verb::get:
-            _callbacks.onGetRequest(session, std::string(request.target()),[this,session, keep_alive]
+            // See __INTERNAL__Server::on_get_request (IrisRestfulServer.cpp) for implementation
+            _callbacks.onGetRequest(session, std::string(request.target()),[this,session, request]
                                     (const std::unique_ptr<GetResponse>& response){
-                response->keep_alive = keep_alive;
                 
                 switch (response->type) {
+                    // Tile Data response (most frequent type of response)
+                    case GetResponse::GET_RESPONSE_TILE: {
+                        auto __response     = reinterpret_cast<GetTileResponse*>(response.get());
+                        auto tile_response  = GENERATE_TILE_RESPONSE(*__response);
+                        FORMAT_RESPONSE(*tile_response, request, _CORS);
+                        return send_buffer(session, tile_response, __response->pixelData);
+                    }
+                        
+                    // String / Text responses (returning text-formatted information)
                     case GetResponse::GET_RESPONSE_UNDEFINED:
                     case GetResponse::GET_RESPONSE_MALFORMED_REQ:
                     case GetResponse::GET_RESPONSE_FILE_NOT_FOUND:
-                    case GetResponse::GET_RESPONSE_METADATA:
-                        return send_response(session, GENERATE_STRING_GET_RESPONSE(*response,_CORS));
-                    case GetResponse::GET_RESPONSE_TILE:
-                    {
-                        HTTPResponseBuffer msg  = std::make_shared<HTTPResponseBuffer_t>();
-                        auto tile_response      = reinterpret_cast<GetTileResponse*>(response.get());
-                        msg->version(11);
-                        msg->result(http::status::ok);
-                        msg->set(http::field::server, "IrisRESTful");
-                        msg->set(http::field::content_type, "image/jpeg");
-                        msg->set("Access-Control-Allow-Origin", _CORS);
-                        
-                        msg->body().data        = tile_response->pixelData->data();
-                        msg->body().size        = tile_response->pixelData->size();
-                        msg->body().more        = false;
-                        msg->keep_alive(keep_alive);
-                        msg->prepare_payload();
-                        send_buffer(session, msg, tile_response->pixelData);
-                        return;
+                    case GetResponse::GET_RESPONSE_METADATA: {
+                        auto string_response = GENERATE_STRING_GET_RESPONSE(*response);
+                        FORMAT_RESPONSE(*string_response, request, _CORS);
+                        return send_response(session, string_response);
                     }
+                    
+                    // File Server responses for Web server functionality (if enabled)
+                    case GetResponse::GET_RESPONSE_FILE: {
+                        auto __response     = reinterpret_cast<GetFileResponse*>(response.get());
+                        auto file_response  = GENERATE_FILE_RESPONSE(*__response);
+                        FORMAT_RESPONSE(*file_response, request, _CORS);
+                        return send_file(session, file_response);
+                    }
+                        
+                    
                 }
             }); return;
         
@@ -327,23 +366,37 @@ void __INTERNAL__Networking::send_response(const Session &session, const HTTPRes
     http::async_write(*session->stream, *response,
                       [this, session, response]
                       (beast::error_code error, size_t bytes_transferred) {
-        if (error) std::cout    << "Error writing response to stream: "
+        if (error) std::cerr    << "["<<session->remote<<"] "
+                                << "Error writing response to stream: "
                                 << error.message();
-        if (response->keep_alive() && IS_STREAM_OPEN(session->stream))
+        if (response->keep_alive() && session->stream->lowest_layer().is_open())
                 read_request (session);
         else    close_stream (session);
     });
 }
 void __INTERNAL__Networking::send_buffer(const Session &session, const HTTPResponseBuffer &response, const Buffer &buffer)
 {
-    auto serializer = std::make_shared<http::serializer<false, http::buffer_body>> (*response);
-
+//    auto serializer = std::make_shared<http::serializer<false, http::buffer_body>> (*response);
     http::async_write(*session->stream, *response,
                       [this, session, response, buffer]
                       (beast::error_code error, size_t bytes_transferred) {
-        if (error) std::cout    << "Error writing response to stream: "
+        if (error) std::cerr    << "["<<session->remote<<"] "
+                                << "Error writing bin buffer response to stream: "
                                 << error.message();
-        if (response->keep_alive() && IS_STREAM_OPEN(session->stream))
+        if (response->keep_alive() && session->stream->lowest_layer().is_open())
+                read_request (session);
+        else    close_stream (session);
+    });
+}
+void __INTERNAL__Networking::send_file(const Session &session, const HTTPResponseFile &response)
+{
+    http::async_write(*session->stream, *response,
+                      [this, session, response]
+                      (beast::error_code error, size_t bytes_transferred){
+        if (error) std::cerr    << "["<<session->remote<<"] "
+                                << "Error writing file response to stream: "
+                                << error.message();
+        if (response->keep_alive() && session->stream->lowest_layer().is_open())
                 read_request (session);
         else    close_stream (session);
     });
@@ -352,12 +405,13 @@ void __INTERNAL__Networking::close_stream(const Session &session)
 {
     beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
     beast::error_code error;
-    if (beast::get_lowest_layer(*session->stream).socket().is_open())
+    if (session->stream->lowest_layer().is_open())
         (*session->stream).shutdown(error);
-    if (error == net::ssl::error::stream_truncated) return;
-//    if (error == net::error::broken_pipe) return;
-    if (error) std::cout    << "Error in closing the stream"
-                            << error.message();
+    if (error == net::ssl::error::stream_truncated ||
+        error == net::error::broken_pipe);
+    else if (error) std::cerr    << "["<<session->remote<<"] "
+                            << "Error in closing the stream: "
+                            << error.message() << "\n";
     
 }
 } // END RESTFUL
