@@ -53,6 +53,7 @@ inline bool PARSE_MIME (const char* const front, const char* const end, std::str
     else if (!mime_view.compare(".txt")) {if(mime)*mime="text/plain";}
     else if (!mime_view.compare(".js")) {if(mime)*mime="application/javascript";}
     else if (!mime_view.compare(".json")) {if(mime)*mime="application/json";}
+    else if (!mime_view.compare(".map")) {if (mime)*mime="application/json";}
     else if (!mime_view.compare(".xml")) {if(mime)*mime="application/xml";}
     else if (!mime_view.compare(".dzi")) {if(mime)*mime="image/dzi";}
     else if (!mime_view.compare(".png")) {if(mime)*mime="image/png";}
@@ -66,6 +67,11 @@ inline bool PARSE_MIME (const char* const front, const char* const end, std::str
     else if (!mime_view.compare(".tif")) {if(mime)*mime="image/tiff";}
     else if (!mime_view.compare(".svg")) {if(mime)*mime="image/svg+xml";}
     else if (!mime_view.compare(".svgz")) {if(mime)*mime="image/svg+xml";}
+    // WARNING! DO NOT UNCOMMENT THIS LINE UNLESS YOU ARE EXTREMELY SURE YOU
+    // KNOW WHAT YOU ARE DOING AND ACCEPT THIS RISK.
+    // Iris RESTful does not want to allow the full download of Iris files
+    // as a security measure against clients scraping all of your slides.
+    // else if (!mime_view.compare(".iris")) {if(mime)*mime="image/iris";}
     else return false;
     return true;
 }

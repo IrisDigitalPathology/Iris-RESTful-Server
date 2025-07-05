@@ -25,6 +25,7 @@ Iris::RESTful::Server Iris::RESTful::create_server(const ServerCreateInfo& info)
         return nullptr;
     }
     
+    // Format the cert path
     if (!mut_info.cert.empty()) {
         mut_info.cert.make_preferred();
         if (std::filesystem::exists(mut_info.cert) == false) {
@@ -35,12 +36,27 @@ Iris::RESTful::Server Iris::RESTful::create_server(const ServerCreateInfo& info)
         }
     }
     
+    // Format the key path
     if (!mut_info.key.empty()) {
         mut_info.key.make_preferred();
         if (std::filesystem::exists(mut_info.key) == false) {
             std::cerr   << "[ERROR] File system reports the provided key ("
                         << mut_info.key
                         << ") does not exist\n";
+        }
+    }
+    
+    // Check the doc root if using for static file serving
+    if (!mut_info.doc_root.empty()) {
+        mut_info.slide_dir.make_preferred();
+        if (mut_info.slide_dir.string().back() != std::filesystem::path::preferred_separator)
+            mut_info.slide_dir+=std::filesystem::path::preferred_separator;
+        
+        if (std::filesystem::is_directory(mut_info.slide_dir) == false) {
+            std::cerr   << "[ERROR] File system reports the provided document root directory ("
+                        << info.slide_dir
+                        << ") does not exist. Using IrisRESTful for static file serving is optional.\n";
+            return nullptr;
         }
     }
     
@@ -79,7 +95,8 @@ _root       (info.slide_dir),
 _doc_root   (info.doc_root),
 _networking (std::make_unique<__INTERNAL__Networking>(ServerCallbacks {
     .onGetRequest = std::bind(&__INTERNAL__Server::on_get_request, this, _1, _2, _3),
-}, info.cert, info.key, "*")),
+}, info.cert, info.key, info.cors.length()?info.cors:_doc_root.empty()?"*":"")),
+// ^Assign a designated CORS, if empty assign * only if no webserver root.
 _threads(Async::createThreadPool())
 {
     

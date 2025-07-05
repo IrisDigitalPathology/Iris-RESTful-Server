@@ -103,6 +103,7 @@ struct ServerCreateInfo {
     std::filesystem::path cert;      /*!< Certificate for SSL connections in PEM format */
     std::filesystem::path key;       /*!< Private key for SSL connections in PEM format*/
     std::filesystem::path doc_root;  /*!< Optional document root when acting as a websever */
+    std::string           cors;      /*!< Optional cross origin policy*/
 };
 
 struct GetRequest {

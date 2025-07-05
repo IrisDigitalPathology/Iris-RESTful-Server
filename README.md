@@ -6,7 +6,7 @@ The Iris RESTful server provides performance access to Iris encoded slide tile d
 
 This server is extremely light-weight, available as a < 20 MB docker image, but can support >7500 slide tile requests per second with <35 ms median response times under that request load (tested with [Locust](https://locust.io) on a single 200$ Rockchip RK3588 [Turing RK1](https://turingpi.com/product/turing-rk1/?attribute_ram=8+GB) based server implementation).
 
-A corresponding derived [OpenSeaDragon](https://openseadragon.github.io) TileSource, the [IrisTileSource]() (authored by [Navin Kathawa](https://github.com/nkathawa)), has been developed to allow for JavaScript slide viewer applications <u>to immediately begin taking advantage of the Iris File Extension slide format in existing slide viewer implementations</u>. 
+A corresponding derived [OpenSeaDragon (OSD)](https://openseadragon.github.io) TileSource, the [IrisTileSource]() (authored by [Navin Kathawa](https://github.com/nkathawa)), has been developed to allow for JavaScript slide viewer applications <u>to immediately begin taking advantage of the Iris File Extension slide format in existing slide viewer implementations</u>. [See FAQ](#how-do-i-use-iris-restful-with-openseadragon) on how to implement an out-of-the-box OSD viewer with Iris RESTful.
 
 > [!WARNING]
 > The Iris RESTful Server is still in active development. Only WADO-RS (DICOMweb) like GET calls are supported at this time. Please check in regularly for updates to the API if you plan to update your implementation.
@@ -120,7 +120,7 @@ Iris RESTful is run with the following arguments:\
  - **-o** *or* **--cors**: *(optional)* Slide viewer domain. Returned in 'Access-Control-Allow-Origin' header
  - **-r** *or* **--root**: *(optional)* Web viewer server document root directory.
 
- The use of CORS and root are generally mutally exclusive, as a web viewer server  should not need to return Access-Control-Allow-Origin responses because is serving up its own slide files.
+ The use of CORS and root are generally mutally exclusive, as a web viewer server  should not need to return Access-Control-Allow-Origin responses because is serving up its own slide files. If run without defining the `-r/--root option`, HTTPS responses will contain `'Access-Control-Allow-Origin':'*'` unless the `-o/--cors option` is defined.  
 ```sh
 IrisRESTful -d <slide-dir> -p <exposed_port> -c <path-to-cert> -k <path-to-key> -o <viewer-domain>
 ```
@@ -131,11 +131,11 @@ IrisRESTful -d /slides -p 3000 -c /etc/ssh/cert.pem -k /ect/ssh/private/key.pem 
 
 This implementation works with the provided container by overloading the default CMD arguments (`IrisRESTful` is the entry point)
 ```sh
-docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${CERT_ROOT}:/ect/ssh -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 -c /etc/ssh/cert.pem -k /ect/ssh/private/key.pem -o slide-viewer.com
+docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${CERT_ROOT}:/ect/ssh -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 -c /etc/ssh/cert.pem -k /ect/ssh/private/key.pem -o your-domain.com
 ```
 
-IrisRESTful can be deployed in two modes: 
-1) **MODULAR CORS**: As a modular slide server ONLY (and will respond ONLY to the above [API](README.md/#api-explained)):
+## IrisRESTful can be deployed in two modes: 
+1) **MODULAR CORS**: As a modular slide server ONLY (and will respond ONLY to the above [Iris RESTful / WADO-RS API](README.md/#api-explained)):
     - This model requires enabling <u><b>[cross origin resource sharing (CORS)](https://en.wikipedia.org/wiki/Cross-origin_resource_sharing#:~:text=CORS%20defines%20a%20way%20in,allowing%20all%20cross%2Dorigin%20requests)</b></u> within your JS/HTML to allow the viewer to access to the Iris slides on a separate connection from the web-service providing your viewer instance.
     Here is an example of how to do this with OpenSeaDragon:
         ```js
@@ -148,9 +148,47 @@ IrisRESTful can be deployed in two modes:
         ```
     - As such you **should** (but are not obligated) to provide IrisRESTful with your web viewer's domain.
         ```sh
-        docker run --rm -p<>:3000 -v<>:/slides docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --cors ${YOUR_DOMAIN.COM}
+        docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --cors ${YOUR_DOMAIN.COM}
         ```
-2) **WEBVIEWER SLIDE-SERVER**: As a webserver with slide serving capabilities by providing the document root ('doc-root') containing your viewer webpage.
+        If you do not provide a domain, the response headers will contain the `Access-Control-Allow-Origin':'*'` (wild-card header).
+2) **WEBVIEWER SLIDE-SERVER**: As a static file server webserver with slide serving capabilities. This abilitiy is activated by providing the document root ('doc-root') containing your viewer webpage.
+    - This requires providing a directory path to a valid directory (`/doc_root`) containing the static files for which you want clients to have access.
+        ```sh
+        docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${WEBSITE_DIR}:/doc_root -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --root /doc_root
+        ```
+        Iris is security oriented and will only serve up files of a select few known extensions. Additional extensions can be added. Legacy image files like Deep Zoom Images (DZI) can also be served up using this mechanism ([See FAQ below](#does-the-iris-restful-servers-optional-ability-to-act-as-a-file-server-allow-it-to-issue-both-dzi-and-iris-style-files))
+## FAQ
+### Does the Iris RESTful Server's optional ability to act as a file server allow it to issue both DZI and Iris encoded files? 
+**Answer**: Yes. If there are custom implementations within your IMS and viewer stack that require some slides be served from a legacy DZI format, you may do so by activating Iris' document root to your DZI containing directory. <u>This will result in a server that issues both IFE and DZI files</u>. In this example, we have a directory that contains both IFE and DZI files (`/slides`) that we wish to mount to the Iris RESTful container(s). 
+```sh
+docker run --rm -p<>:3000 -v<>:/slides docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --root /slides
+```
+IFE will now look for both IFE encoded slides as well as just generic files within this directory. Iris RESTful is security oriented and therefore only returns files of known extension with a defined MIME, including DZI files.
+>[!NOTE]
+>Iris RESTful will **NOT** allow clients to download entire `.iris` files within the `document-root` directory unless you build a custom version of Iris RESTful with this capability activated. See [IrisRestfulGetParser.cpp](./src/IrisRestfulGetParser.cpp) PARSE_MIME function definition for information on activating this ability. We do **NOT** recommend doing so. 
+
+### How do I use Iris RESTful with OpenSeaDragon?
+We have provided a OpenSeaDragon (OSD) derived TileSource implementation ([IrisTileSource]()) that natively understands the Iris RESTful API. Follow the ["Getting Started" Documentation](https://openseadragon.github.io/docs/) on OpenSeaDragon's github.io. You must then design your index.html to use IrisTileSource instead of the default tile sources. 
+```html
+<div id="viewer" style="width: 100%; height: 100%; border: 1px solid black"></div>
+<script src="/openseadragon/openseadragon.js"></script>
+<script>
+    const viewer = OpenSeadragon({
+        id: "viewer",
+        prefixUrl: "/openseadragon/images/",
+        tileSources: new OpenSeadragon.IrisTileSource({
+            // For a locally hosted example server
+            serverUrl: "https://localhost:3000",
+            // For a slide named "example.iris":
+            slideId: "example", 
+            // If not static file serving
+            crossOriginPolicy: 'Anonymous',
+        }),
+        // Make sure to allow full zooming
+        maxZoomLevel: 64
+    });
+</script>
+```
 
 > [!WARNING]
 > THIS SECTION IS INCOMPLETE

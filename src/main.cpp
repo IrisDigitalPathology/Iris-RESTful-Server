@@ -17,15 +17,19 @@ The Iris RESTful server is Licensed under the MIT Sofware License and is \
 Copyright (c) 2025 Ryan Landvater \n";
 
 constexpr char help_statement[] =
-"Arugments:\n \
+"Arugments:\n\
 -h --help: Print this help text \n\
 -p --port: \n\
 -d --dir: Directory path to the directory containing the Iris Slide Files to be served\n\
 -c --cert: Public SSL certificate in PEM format for establishing HTTPS connections\n\
 -k --key: Private key in PEM format to sign argument provided in CERT\n\
+-o --cors: Slide viewer domain. Returned in 'Access-Control-Allow-Origin' header\n\
+-r --root: Web viewer server document root directory for activating RESTful server as file server\n\
+If run without defining the -r/--root option, HTTPS responses will contain \
+'Access-Control-Allow-Origin':'*' unless the `-o/--cors option` is defined. \n\
 \n\
-Usage: IrisRESTful -p <port> -d <slide_root> -c <cert.pem> -k <key.pem>\n\
-Example:\n\tIrisRESTful -p 3000 -d /slides -c /ect/ssl/iris_cert.pem -k /ect/ssl/private/iris_key.pem\n\
+Usage: IrisRESTful -p <port> -d <slide_root> -c <cert.pem> -k <key.pem> -r <document_root>\n\
+Example:\n\tIrisRESTful -p 3000 -d /slides -c /ect/ssl/iris_cert.pem -k /ect/ssl/private/iris_key.pem -r /openseadragon\n\
 \n";
 
 enum ArgumentFlag : uint32_t {
@@ -34,6 +38,8 @@ enum ArgumentFlag : uint32_t {
     ARG_DIR,
     ARG_CERT,
     ARG_KEY,
+    ARG_CORS,
+    ARG_ROOT,
     ARG_INVALID = UINT32_MAX
 };
 
@@ -48,6 +54,10 @@ inline ArgumentFlag PARSE_ARGUMENT (const char* arg_str) {
         return ARG_CERT;
     if (strstr(arg_str,"-k") || strstr(arg_str, "--key"))
         return ARG_KEY;
+    if (strstr(arg_str,"-o") || strstr(arg_str, "--cors"))
+        return ARG_CORS;
+    if (strstr(arg_str,"-r") || strstr(arg_str, "--root"))
+        return ARG_ROOT;
     return ARG_INVALID;
 }
 
@@ -97,6 +107,7 @@ int main(int argc, char* argv[])
                 
             case ARG_DIR:
                 if (argi+1>=argc) {
+                    FAILED_SLIDE_DIRECTORY:
                     std::cerr   << "Slide directory argument requires directory path\n"
                                 << help_statement;
                     return EXIT_FAILURE;
@@ -121,7 +132,7 @@ int main(int argc, char* argv[])
                 if (std::filesystem::exists(info.cert) == false) {
                     std::cerr   << "OS reports the provided file path for server cert \""
                                 << info.cert
-                                << "\" is an invalide file path.\n"
+                                << "\" is an invalide file path.\n\n"
                                 << help_statement;
                     return EXIT_FAILURE;
                 }
@@ -135,9 +146,35 @@ int main(int argc, char* argv[])
                 }
                 info.key = std::string(argv[++argi]);
                 if (std::filesystem::exists(info.key) == false) {
-                    std::cerr   << "OS reports the provided file path for server private key \""
+                    std::cerr   << "OS reports the provided file path for server private key "
                                 << info.key
-                                << "\" is an invalide file path.\n"
+                                << " is an invalide PEM key file path.\n\n"
+                                << help_statement;
+                    return EXIT_FAILURE;
+                }
+                break;
+                
+            case ARG_CORS:
+                if (argi+1>=argc) {
+                    std::cerr   <<"Cross origin resource sharing requires a valid domain\n"
+                                << help_statement;
+                    return EXIT_FAILURE;
+                }
+                info.cors = std::string(argv[++argi]);
+                break;
+                
+            case ARG_ROOT:
+                if (argi+1>=argc) {
+                    FAILED_ROOT_FILE_DIR:
+                    std::cerr   <<"Root file directory requires a valid file directory\n"
+                                << help_statement;
+                    return EXIT_FAILURE;
+                }
+                info.doc_root = std::string(argv[++argi]);
+                if (std::filesystem::is_directory(info.doc_root) == false) {
+                    std::cerr   << "OS reports the provided document root file path \""
+                                << info.doc_root
+                                << "\" is an invalide directory path.\n"
                                 << help_statement;
                     return EXIT_FAILURE;
                 }
