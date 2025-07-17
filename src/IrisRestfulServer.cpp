@@ -1,12 +1,12 @@
 /**
  * @file IrisRestfulServer.cpp
  * @author Ryan Landvater (ryanlandvater [at] gmail [dot] com)
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2025-06-07
- * 
+ *
  * @copyright Copyright (c) 2025 Iris Developers
- * 
+ *
  */
 #include "IrisRestfulPriv.hpp"
 Iris::RESTful::Server Iris::RESTful::create_server(const ServerCreateInfo& info)
@@ -193,7 +193,7 @@ Slide __INTERNAL__Server::get_slide (const std::string &id)
     std::filesystem::path file_path (_root.string()+id+".iris");
     Slide slide;
     try { slide = validate_and_open_slide(file_path);}
-    catch (std::runtime_error& error) {
+    catch (std::runtime_error &error) {
         std::string msg = error.what() ? error.what() :
         std::string("[undefined error in file") + __FILE__ + "]";
         std::cerr   << "Failed to open slide id ("

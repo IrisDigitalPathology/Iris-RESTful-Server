@@ -131,7 +131,7 @@ inline Result LOAD_CERTIFICATE_AND_KEY (const std::filesystem::path& cert_path,
         BIO_get_mem_ptr(key_mem, &key_bptr);
         key = Iris::Copy_strong_buffer_from_data (key_bptr->data, key_bptr->length);
         
-    } catch (std::runtime_error& error) {
+    } catch (std::runtime_error & error) {
         std::string msg = error.what() ? error.what() :
         std::string("[undefined error in file") + __FILE__ + "]";
         result = Result(IRIS_FAILURE,

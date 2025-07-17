@@ -49,17 +49,19 @@ The specific API you plan to use will be indicated up front. Presently the API w
 - Iris RESTful API: `<URL>/slides/`
 - WADO-RS API: `<URL>/studies/`
 
-
 ## Retrieve Metadata
 ### Iris RESTful
 ```
 GET <URL>/slides/<slide-name>/metadata 
 ```
+Example: [https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata](https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata)
 ### WADO-RS (supported calls)
 ```
 GET <URL>/studies/<study>/series/<UID>/metadata 
 GET <URL>/studies/<study>/series/<UID>/instances/<layer-number>/metadata
 ```
+Example: [https://examples.restful.irisdigitalpathology.org/studies/example/series/cervix_2x_jpeg/metadata](https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata)
+
 When using WADO-RS, it is important to note that Iris File Extension encodes the entire digital slide in a single file. It does **not** represent layers as individual files with duplicated metadata like native DICOM. Therefore there is only a single authoritative version of the metadata in IFE encode files and consequentially any metadata GET requests for a single layer / DICOM-instance (*code-block line 2*) returns only some metadata when called. It is preferred that viewers simply call the entire slide metadata (*line 1*), which contains an array of layer specific information as well. 
 ### Metadata Structure
 Metadata is returned in the form of a JSON object with the structure shown in the below example.
@@ -141,8 +143,8 @@ docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${CERT_ROOT}:/ect/ssh -p ${CONNE
         ```js
         // Example OpenSeaDragon IrisTileSource with CORS enabled
         tileSources: new OpenSeadragon.IrisTileSource({
-            serverUrl: "<server_url>", 
-            slideId: "slide_name",
+            serverUrl: "<server_url>", // HTTPS required
+            slideId: "slide_name", // for slide_name.iris
             crossOriginPolicy: 'Anonymous', // CORS ENABLED
         }),
         ```
@@ -159,16 +161,16 @@ docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${CERT_ROOT}:/ect/ssh -p ${CONNE
         Iris is security oriented and will only serve up files of a select few known extensions. Additional extensions can be added. Legacy image files like Deep Zoom Images (DZI) can also be served up using this mechanism ([See FAQ below](#does-the-iris-restful-servers-optional-ability-to-act-as-a-file-server-allow-it-to-issue-both-dzi-and-iris-style-files))
 ## FAQ
 ### Does the Iris RESTful Server's optional ability to act as a file server allow it to issue both DZI and Iris encoded files? 
-**Answer**: Yes. If there are custom implementations within your IMS and viewer stack that require some slides be served from a legacy DZI format, you may do so by activating Iris' document root to your DZI containing directory. <u>This will result in a server that issues both IFE and DZI files</u>. In this example, we have a directory that contains both IFE and DZI files (`/slides`) that we wish to mount to the Iris RESTful container(s). 
+**Answer: Yes**. If there are custom implementations within your IMS and viewer stack that require some slides be served from a legacy DZI format, you may do so by activating Iris' document root to your DZI containing directory. <u>This will result in a server that issues both IFE and DZI files</u>. In this example, we have a directory that contains both IFE and DZI files (`/slides`) that we wish to mount to the Iris RESTful container(s). 
 ```sh
-docker run --rm -p<>:3000 -v<>:/slides docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --root /slides
+docker run --rm -p<host-port>:3000 -v<slide-dir>:/slides docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --root /slides
 ```
 IFE will now look for both IFE encoded slides as well as just generic files within this directory. Iris RESTful is security oriented and therefore only returns files of known extension with a defined MIME, including DZI files.
 >[!NOTE]
 >Iris RESTful will **NOT** allow clients to download entire `.iris` files within the `document-root` directory unless you build a custom version of Iris RESTful with this capability activated. See [IrisRestfulGetParser.cpp](./src/IrisRestfulGetParser.cpp) PARSE_MIME function definition for information on activating this ability. We do **NOT** recommend doing so. 
 
 ### How do I use Iris RESTful with OpenSeaDragon?
-We have provided a OpenSeaDragon (OSD) derived TileSource implementation ([IrisTileSource]()) that natively understands the Iris RESTful API. Follow the ["Getting Started" Documentation](https://openseadragon.github.io/docs/) on OpenSeaDragon's github.io. You must then design your index.html to use IrisTileSource instead of the default tile sources. 
+**Using the IrisTileSource.** We have provided a OpenSeaDragon (OSD) derived TileSource implementation ([IrisTileSource]()) that natively understands the Iris RESTful API. Follow the ["Getting Started" Documentation](https://openseadragon.github.io/docs/) on OpenSeaDragon's github.io. You must then design your index.html to use IrisTileSource instead of the default tile sources. 
 ```html
 <div id="viewer" style="width: 100%; height: 100%; border: 1px solid black"></div>
 <script src="/openseadragon/openseadragon.js"></script>
@@ -177,15 +179,13 @@ We have provided a OpenSeaDragon (OSD) derived TileSource implementation ([IrisT
         id: "viewer",
         prefixUrl: "/openseadragon/images/",
         tileSources: new OpenSeadragon.IrisTileSource({
-            // For a locally hosted example server
-            serverUrl: "https://localhost:3000",
-            // For a slide named "example.iris":
-            slideId: "example", 
+            // For a our hosted RESTful API example server
+            serverUrl: "https://examples.restful.irisdigitalpathology.org",
+            // For one of our example slides named "cervix_2x_jpeg.iris":
+            slideId: "cervix_2x_jpeg", 
             // CORS if not static file serving
             crossOriginPolicy: 'Anonymous',
         }),
-        // Make sure to allow full zooming
-        maxZoomLevel: 64
     });
 </script>
 ```

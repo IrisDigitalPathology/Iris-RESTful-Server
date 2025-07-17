@@ -4,9 +4,9 @@
  * @brief Based upon the work of Vinnie Falco and Boost/Beast
  * @version 0.1
  * @date 2025-06-07
- * 
+ *
  * @copyright Copyright (c) 2025 Iris Developers
- * 
+ *
  */
 
 #ifdef __clang__
@@ -21,7 +21,7 @@
 #pragma clang diagnostic pop
 #endif // __clang__
 
-#define BOOST_IMPLEMENT // Allow for class definitions 
+#define BOOST_IMPLEMENT // Allow for class definitions
 namespace   net       = boost::asio;
 namespace   beast     = boost::beast;
 namespace   ssl       = net::ssl;
