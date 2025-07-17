@@ -148,9 +148,11 @@ void __INTERNAL__Pool::process_tasks() {
                 }
             }
         } catch (std::runtime_error& error) {
+            std::string msg = error.what() ? error.what() :
+            std::string("[undefined error in file") + __FILE__ + "]";
             std::stringstream LOG;
             LOG         << "[WARNING] Exception thrown on Arke Async callback thread: "
-                        << error.what() << "\n";
+                        << msg << "\n";
             std::cerr   << LOG.str();
             
     

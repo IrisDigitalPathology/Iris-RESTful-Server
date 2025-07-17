@@ -63,8 +63,10 @@ Iris::RESTful::Server Iris::RESTful::create_server(const ServerCreateInfo& info)
     // Create a server instance
     try { return std::make_shared<__INTERNAL__Server>(mut_info); }
     catch (std::runtime_error& error) {
+        std::string msg = error.what() ? error.what() :
+        std::string("[undefined error in file") + __FILE__ + "]";
         std::cerr   << "Failed to create server instance: "
-                    << error.what() << "\n";
+                    << msg << "\n";
         return NULL;
     }
     
@@ -80,9 +82,11 @@ Iris::Result Iris::RESTful::server_listen(const Server& server, uint16_t port)
         server->listen(port);
         
     } catch (std::runtime_error& error) {
+        std::string msg = error.what() ? error.what() :
+        std::string("[undefined error in file") + __FILE__ + "]";
         return Result (IRIS_FAILURE,
                        std::string("Iris RESTful Server failed to listen at ") +
-                       std::to_string(port) + "." + error.what());
+                       std::to_string(port) + ". " + msg);
         
     }   return IRIS_SUCCESS;
 }
@@ -121,7 +125,7 @@ inline std::unique_ptr<GetResponse> PROCESS_GET_FILE_REQUEST (const std::unique_
         response->mime      = request.mime;
     } catch (std::runtime_error& e) {
         response->type      = GetResponse::GET_RESPONSE_FILE_NOT_FOUND;
-        response->error_msg = e.what();
+        response->error_msg = e.what()?e.what():"[undefined error]";
     }
     return response;
 }
@@ -189,9 +193,11 @@ Slide __INTERNAL__Server::get_slide (const std::string &id)
     std::filesystem::path file_path (_root.string()+id+".iris");
     Slide slide;
     try { slide = validate_and_open_slide(file_path);}
-    catch (std::runtime_error &error) {
+    catch (std::runtime_error& error) {
+        std::string msg = error.what() ? error.what() :
+        std::string("[undefined error in file") + __FILE__ + "]";
         std::cerr   << "Failed to open slide id ("
-                    <<id<<"): "<<error.what()<<"\n";
+                    <<id<<"): "<<msg<<"\n";
         return nullptr;
     }
     

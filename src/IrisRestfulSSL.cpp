@@ -131,10 +131,12 @@ inline Result LOAD_CERTIFICATE_AND_KEY (const std::filesystem::path& cert_path,
         BIO_get_mem_ptr(key_mem, &key_bptr);
         key = Iris::Copy_strong_buffer_from_data (key_bptr->data, key_bptr->length);
         
-    } catch (std::runtime_error & error) {
+    } catch (std::runtime_error& error) {
+        std::string msg = error.what() ? error.what() :
+        std::string("[undefined error in file") + __FILE__ + "]";
         result = Result(IRIS_FAILURE,
                         std::string("[ERROR] Failed to read the provided certificate/key files: ") +
-                        error.what() + "\n");
+                        msg + "\n");
     }
 
     if (cert_mem)   BIO_free(cert_mem);
@@ -206,9 +208,11 @@ inline Result GENERATE_SELF_SIGNED_CERT (Iris::Buffer & cert, Iris::Buffer & key
         key = Iris::Copy_strong_buffer_from_data (key_bptr->data, key_bptr->length);
         
     } catch (std::runtime_error& error) {
+        std::string msg = error.what() ? error.what() :
+        std::string("[undefined error in file") + __FILE__ + "]";
         result = Result(IRIS_FAILURE,
                         std::string("[ERROR] Failed to generate a self-signed certificate: ") +
-                        error.what() + "\n");
+                        msg + "\n");
     }
     
     if (cert_mem)   BIO_free(cert_mem);

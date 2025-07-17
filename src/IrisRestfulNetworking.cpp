@@ -76,8 +76,10 @@ ACTIVE      (true)
             while (ACTIVE) try {
                 _context->run();
             } catch (std::runtime_error& error) {
+                std::string msg = error.what() ? error.what() :
+                std::string("[undefined error in file") + __FILE__ + "]";
                 std::cout   << "[ERROR] Network socket error: "
-                            << error.what() << "\n";
+                            << msg << "\n";
             } catch (beast::error_code& error) {
                 std::cout   << "[ERROR] Network socket error: "
                             << error.message() << "\n";
