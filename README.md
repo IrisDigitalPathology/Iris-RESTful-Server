@@ -142,7 +142,7 @@ docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${CERT_ROOT}:/ect/ssh -p ${CONNE
     Here is an example of how to do this with OpenSeaDragon:
         ```js
         // Example OpenSeaDragon IrisTileSource with CORS enabled
-        tileSources: new OpenSeadragon.IrisTileSource({
+        const tileSource = new OpenSeadragon.IrisTileSource({
             serverUrl: "<server_url>", // HTTPS required
             slideId: "slide_name", // for slide_name.iris
             crossOriginPolicy: 'Anonymous', // CORS ENABLED
@@ -175,18 +175,31 @@ IFE will now look for both IFE encoded slides as well as just generic files with
 <div id="viewer" style="width: 100%; height: 100%; border: 1px solid black"></div>
 <script src="/openseadragon/openseadragon.js"></script>
 <script>
+    // Create the viewer
     const viewer = OpenSeadragon({
         id: "viewer",
         prefixUrl: "/openseadragon/images/",
-        tileSources: new OpenSeadragon.IrisTileSource({
-            // For a our hosted RESTful API example server
-            serverUrl: "https://examples.restful.irisdigitalpathology.org",
-            // For one of our example slides named "cervix_2x_jpeg.iris":
-            slideId: "cervix_2x_jpeg", 
-            // CORS if not static file serving
-            crossOriginPolicy: 'Anonymous',
-        }),
     });
+
+    // Create the IrisTileSource
+    const tileSource = new OpenSeadragon.IrisTileSource({
+        // Your server goes here.
+        // For example our hosted RESTful API example server
+        serverUrl: "https://examples.restful.irisdigitalpathology.org",
+        
+        // Your slide file name goes here, excluding the '.iris'
+        // For example a hosted slide named "cervix_2x_jpeg.iris":
+        slideId: "cervix_2x_jpeg",
+
+        // CORS if the server is not set for static file serving
+        crossOriginPolicy: 'Anonymous',
+    });
+    
+    // Ensure there is no race condition between viewer and tile source
+    tileSource.addHandler('ready', function () {
+        viewer.open(tileSource);
+    });
+
 </script>
 ```
 
