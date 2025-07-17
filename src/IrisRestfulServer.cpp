@@ -241,28 +241,27 @@ void __INTERNAL__Server::on_get_request(const Session& session,
         switch (request->protocol) {
             // Are we attempting to use Iris RESTFUL as a webserver as well
             // to avoid Cross Origin serving?
-            case GetRequest::GET_REQUEST_FILE:
+            case GetRequest::GET_REQUEST_FILE:/* OPTIONAL must be activated */
                 if(_doc_root.empty()) {
                     response->type = GetMetadataResponse::GET_RESPONSE_FILE_NOT_FOUND;
                     response->error_msg =
                     "This Iris RESTful implementation is not configured to run as a web server / file server.";
                     return on_response(response);
-                } else {
-                    return on_response(PROCESS_GET_FILE_REQUEST(request, _doc_root));
-                }
+                } else return on_response(PROCESS_GET_FILE_REQUEST(request, _doc_root));
+                
                 
             // Standard IRIS or DICOM Requests
             case GetRequest::GET_REQUEST_IRIS:  break;
             case GetRequest::GET_REQUEST_DICOM: break;
             
+            // Anything else is considered malformed
             case GetRequest::GET_REQUEST_MALFORMED:
             default: goto MALFORMED_REQUEST;
         }
         
         // Check to see what is requested
         switch (request->type) {
-            case GetRequest::GET_REQUEST_UNDEFINED: goto MALFORMED_REQUEST;
-                
+
             case GetRequest::GET_REQUEST_TILE: {
                 auto& __request = *reinterpret_cast<GetTileRequest*>(request.get());
                 if (!session->slide || *(session->slide) != __request.id) {
@@ -289,18 +288,15 @@ void __INTERNAL__Server::on_get_request(const Session& session,
                 on_response(PROCESS_GET_METATADATA_REQUEST(request, session->slide));
                 return;
             }
+                
+            case GetRequest::GET_REQUEST_UNDEFINED:
+            default: goto MALFORMED_REQUEST;
         }
-        
-        // Uncaught error (the switch case)
-        response->type  = GetResponse::GET_RESPONSE_UNDEFINED;
-        response->error_msg = request->error_msg.size()?request->error_msg:
-        "Undefined GET request error. IrisRESTful server did elaborate on what happened.";
-        on_response(response);
-        return;
         
         MALFORMED_REQUEST:
         response->type  = GetResponse::GET_RESPONSE_MALFORMED_REQ;
-        response->error_msg = request->error_msg;
+        response->error_msg = request->error_msg.size()?request->error_msg:
+        "Undefined GET request error. IrisRESTful server did elaborate on what happened.";
         on_response (response);
     });
 }

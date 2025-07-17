@@ -19,18 +19,13 @@ ThreadPool createThreadPool (uint32_t thread_pool_size)
     return std::make_shared<__INTERNAL__Pool>(thread_pool_size);
 }
 
-void __INTERNAL__Fence::wait_on_signal (int64_t ms) {
-    MutexLock __(block);                                       // Else capture its mutex for a lock object...
-    if (complete) return;                                      // If the task is not oustanding, return
-    if (ms < 0)
-         on_complete.wait(__);                                  // And wait for the task to signal completion
-    else
-        on_complete.wait_for(__,std::chrono::milliseconds(ms)); // And wait for the task to signal completion or max time
+void __INTERNAL__Fence::wait_on_signal () {
+    complete.wait(false);
 }
 
 __INTERNAL__Pool::__INTERNAL__Pool (uint32_t thread_pool_size) :
-_threads (thread_pool_size),
-ACTIVE   (true)
+_threads    (thread_pool_size),
+status      (POOL_ACTIVE)
 {
     // Start all of the callback threads
     for (auto& thread : _threads)
@@ -43,10 +38,14 @@ __INTERNAL__Pool::~__INTERNAL__Pool ()
 {
     wait_until_complete();
 }
+inline void WARN_INACTIVE_QUEUE()
+{
+    std::cerr << "[WARNING] Iris Async Pool: Attempting to enqueue task to inactive queue\n";
+}
 void __INTERNAL__Pool::issue_task(const LambdaPtr &lambda)
 {
     // Return if the pool is not active / Shutting down
-    if (!ACTIVE) return;
+    if (status & POOL_TERMINATING) return WARN_INACTIVE_QUEUE();
     
     // Insert the task into the list.
     _tasks.push(Callback{
@@ -60,7 +59,7 @@ void __INTERNAL__Pool::issue_task(const LambdaPtr &lambda)
 Fence __INTERNAL__Pool::issue_task_with_fence(const LambdaPtr &lambda)
 {
     // Return if the pool is not active / Shutting down
-    if (!ACTIVE) return nullptr;
+    if (status & POOL_TERMINATING) { WARN_INACTIVE_QUEUE(); return NULL; }
     
     // Create a callback fence
     auto fence = std::make_shared<__INTERNAL__Fence>();
@@ -76,12 +75,38 @@ Fence __INTERNAL__Pool::issue_task_with_fence(const LambdaPtr &lambda)
     
     return fence;
 }
-void __INTERNAL__Pool::wait_until_complete () {
-    ACTIVE.store(false);                                        // Switch the pool to the inactive state
+void __INTERNAL__Pool::wait_until_complete ()
+{
+    {// Switch the pool to the draining state
+        auto STATUS = status.load();
+        while(!status.compare_exchange_weak(STATUS, (__status)(STATUS|POOL_DRAINING)));
+    }
     _task_added.notify_all();                                   // Ensure all exit the wait.
     for (auto& thread : _threads)                               // Iterate over each worker
         if (thread.joinable())                                  // Check if it is outstanding; if so...
             thread.join();                                      // Merge threads and wait for it to complete.
+    status.store(POOL_INACTIVE);
+}
+void __INTERNAL__Pool::terminate()
+{
+    {   // Switch the pool to the terminated state
+        auto STATUS = status.load();
+        while(!status.compare_exchange_weak(STATUS, (__status)(STATUS|POOL_TERMINATING)));
+    }
+    _task_added.notify_all();                                   // Ensure all exit the wait.
+    for (auto& thread : _threads)                               // Iterate over each worker
+        if (thread.joinable())                                  // Check if it is outstanding; if so...
+            thread.join();                                      // Merge threads and wait for it to complete.
+    status.store(POOL_INACTIVE);
+}
+void __INTERNAL__Pool::reset() {
+    wait_until_complete();
+    status.store(POOL_ACTIVE);
+    for (auto& thread : _threads)
+        thread = std::thread {
+            &__INTERNAL__Pool::process_tasks,
+            this
+        };
 }
 void __INTERNAL__Pool::process_tasks() {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
@@ -91,8 +116,8 @@ void __INTERNAL__Pool::process_tasks() {
     Callback callback_entry;
     Iterator<Callback> __it = _tasks.begin();
     MutexLock task_lock     = MutexLock(_task_added_mtx, std::defer_lock);
-    
-    while (ACTIVE) {
+
+    while (status == POOL_ACTIVE) {
         // Wait for a task to be issued.
         try {
             task_lock.lock();
@@ -107,7 +132,7 @@ void __INTERNAL__Pool::process_tasks() {
         
         // Attempt to implement those tasks.
         try {
-            while (__it.pop(callback_entry)) {
+            while (__it.pop(callback_entry) && (status ^ POOL_TERMINATING)) {
                 // Get the entry at the iterator's location.
 
                 // Invoke the callback method and then release 
@@ -119,12 +144,12 @@ void __INTERNAL__Pool::process_tasks() {
                 auto fence = callback_entry.fenceOptional;
                 if (fence) {
                     fence->complete = true;
-                    fence->on_complete.notify_all();
+                    fence->complete.notify_all();
                 }
             }
         } catch (std::runtime_error& error) {
             std::stringstream LOG;
-            LOG         << "Exception thrown on Arke Async callback thread: "
+            LOG         << "[WARNING] Exception thrown on Arke Async callback thread: "
                         << error.what() << "\n";
             std::cerr   << LOG.str();
             

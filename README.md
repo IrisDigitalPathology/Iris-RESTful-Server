@@ -60,7 +60,7 @@ GET <URL>/slides/<slide-name>/metadata
 GET <URL>/studies/<study>/series/<UID>/metadata 
 GET <URL>/studies/<study>/series/<UID>/instances/<layer-number>/metadata
 ```
-It is important to note that Iris File Extension encodes the entire slide in a single file. It does **not** represent layers as individual files with duplicated metadata like native DICOM. Therefore in IFE encode files, there is only a single authoritative version of the metadata and thus metadata GET requests for a single layer / DICOM-instance (*code-block line 2*) returns only some metadata when called. It is preferred that viewers simply call the entire slide metadata (*line 1*), which contains an array of layer specific information as well. 
+When using WADO-RS, it is important to note that Iris File Extension encodes the entire digital slide in a single file. It does **not** represent layers as individual files with duplicated metadata like native DICOM. Therefore there is only a single authoritative version of the metadata in IFE encode files and consequentially any metadata GET requests for a single layer / DICOM-instance (*code-block line 2*) returns only some metadata when called. It is preferred that viewers simply call the entire slide metadata (*line 1*), which contains an array of layer specific information as well. 
 ### Metadata Structure
 Metadata is returned in the form of a JSON object with the structure shown in the below example.
 ```json
@@ -181,7 +181,7 @@ We have provided a OpenSeaDragon (OSD) derived TileSource implementation ([IrisT
             serverUrl: "https://localhost:3000",
             // For a slide named "example.iris":
             slideId: "example", 
-            // If not static file serving
+            // CORS if not static file serving
             crossOriginPolicy: 'Anonymous',
         }),
         // Make sure to allow full zooming

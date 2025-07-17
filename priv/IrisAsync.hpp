@@ -26,26 +26,29 @@ struct Callback {
 };
 
 struct __INTERNAL__Fence {
-    bool                            complete = false;
-    Mutex                           block;
-    Notification                    on_complete;
+    atomic_bool                     complete;
     
-    explicit __INTERNAL__Fence      ()
-    { }
+    explicit __INTERNAL__Fence      () :
+    complete                        (false) { }
     __INTERNAL__Fence               (const __INTERNAL__Fence&) = delete;
     __INTERNAL__Fence& operator =   (const __INTERNAL__Fence&) = delete;
-    /// Wait on the fences signal to indicate the task was completed. Optionally add a maximum
-    /// duration to wait (to avoid sleeping a thread indefinitely). If you do not want to give a max
-    /// duration, issue -1.
-    void wait_on_signal (int64_t max_ms_to_wait_for = -1);
+    void wait_on_signal ();
 };
+
+enum __status : uint8_t {
+    POOL_ACTIVE         = 0,
+    POOL_DRAINING       = 0x01,
+    POOL_TERMINATING    = 0x10,
+    POOL_INACTIVE       = 0xFF
+};
+using Status = std::atomic<__status>;
 
 class __INTERNAL__Pool {
     TaskList        _tasks;
     Threads         _threads;
-    Mutex           _task_added_mtx;
-    Notification    _task_added;
-    atomic_bool     ACTIVE;
+    Mutex           _task_added_mtx; // Used only for conditional variable
+    Notification    _task_added;     // Conditional variable notification
+    Status          status;
     
 public:
     explicit __INTERNAL__Pool       (uint32_t thread_pool_size);
@@ -55,7 +58,8 @@ public:
     void    issue_task              (const LambdaPtr&);
     Fence   issue_task_with_fence   (const LambdaPtr&);
     void    wait_until_complete     ();
-    
+    void    terminate               ();
+    void    reset                   ();
 private:
     void    process_tasks           ();
 };

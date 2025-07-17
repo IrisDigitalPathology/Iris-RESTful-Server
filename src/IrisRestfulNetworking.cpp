@@ -76,13 +76,13 @@ ACTIVE      (true)
             while (ACTIVE) try {
                 _context->run();
             } catch (std::runtime_error& error) {
-                std::cout   << "Network socket error: "
+                std::cout   << "[ERROR] Network socket error: "
                             << error.what() << "\n";
             } catch (beast::error_code& error) {
-                std::cout   << "Network socket error: "
+                std::cout   << "[ERROR] Network socket error: "
                             << error.message() << "\n";
             } catch (...) {
-                std::cout   << "Undefined network error\n";
+                std::cout   << "[ERROR] Undefined network error thrown\n";
             }
         }};
 }
@@ -173,7 +173,7 @@ void __INTERNAL__Networking::accept_connection(const ASIOAcceptor &acceptor)
             if (error) {
                 std::cerr   << "["<<session->stream->lowest_layer().remote_endpoint()<<"]"
                             << "Error in performing SSL handshake: "
-                            << error.what() << "\n";
+                            << error.message() << "\n";
             } else {
                 read_request (session);
             }
@@ -266,10 +266,10 @@ inline HTTPResponseFile GENERATE_FILE_RESPONSE (const GetFileResponse& file_resp
     msg->body().open(file_response.address.c_str(), beast::file_mode::read, ec);
     if (ec) {
         std::stringstream error;
-        error   << "[ERROR] Cannot generate http::file_body response: " << ec.what() << ". "
+        error   << "[ERROR] Cannot generate http::file_body response: " << ec.message() << ". "
                 << "Set a breakpoint in " << __FILE__ << " line no " << __LINE__ << "to debug.";
         assert(false && error.str().c_str());
-        throw std::runtime_error(ec.what());
+        throw std::runtime_error(ec.message());
     }
     return msg;
 }
