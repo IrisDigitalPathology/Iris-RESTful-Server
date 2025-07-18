@@ -1,0 +1,35 @@
+name: Iris RESTful macOS CMake CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '*/README.md'
+  pull_request:
+    branches: 
+      - main
+    paths-ignore:
+      - '*/README.md'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      
+      matrix:
+        os: [macos-latest, macos-13]
+        build_type: [Release]
+        include:
+          - os: macos-latest
+            name: macos
+            arch: arm64
+          - os: macos-13
+            name: macos
+            arch: x86_64
+
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      os: ${{ matrix.os }}
+      build_type: ${{ matrix.build_type }}
+      artifact: ${{ matrix.name }}-${{ matrix.arch }}

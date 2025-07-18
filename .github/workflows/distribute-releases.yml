@@ -1,0 +1,103 @@
+name: Construct Release Artifacts
+
+on:
+  release:
+    types: [published]
+
+concurrency: 
+  group: Github Release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build_linux:
+    strategy: 
+      fail-fast: true
+
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+        build_type: [Release]
+        c_compiler: [clang]
+        include:
+          - c_compiler: clang
+            cpp_compiler: clang++
+          - os: ubuntu-latest
+            name: ubuntu
+            arch: aarch64
+          - os: ubuntu-24.04-arm
+            name: ubuntu
+            arch: amd64
+
+    uses: ./.github/workflows/build-linux.yml
+    with: 
+      os: ${{ matrix.os }}
+      c_compiler: ${{ matrix.c_compiler }}
+      cpp_compiler: ${{ matrix.cpp_compiler }}
+      build_type: ${{ matrix.build_type }}
+      artifact: ${{ matrix.name }}-${{ matrix.arch }}
+
+  build_macos:
+    strategy:
+      fail-fast: true
+
+      matrix:
+        os: [macos-latest, macos-13]
+        build_type: [Release]
+        include:
+          - os: macos-latest
+            name: macos
+            arch: arm64
+          - os: macos-13
+            name: macos
+            arch: x86_64
+
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      os: ${{ matrix.os }}
+      build_type: ${{ matrix.build_type }}
+      artifact: ${{ matrix.name }}-${{ matrix.arch }}
+
+#   WIN BUILD DISABLED Uncomment the following section to enable Windows builds
+#   build_windows:
+#     strategy:
+#       fail-fast: false
+      
+#       matrix:
+#         os: [windows-latest]
+#         build_type: [Release]
+#         c_compiler: [cl]
+
+#         include: 
+#           - c_compiler: cl
+#             cpp_complier: cl
+#           - os: windows-latest
+#             name: windows
+#             arch: x86_64
+
+#     uses: ./.github/workflows/build-win64.yml
+#     with:
+#       os: ${{ matrix.os }}
+#       c_compiler: ${{ matrix.c_compiler }}
+#       cpp_compiler: ${{ matrix.cpp_complier }}
+#       build_type: ${{ matrix.build_type }}
+#       artifact: ${{ matrix.name }}-${{ matrix.arch }}
+
+  upload_artifacts:
+    runs-on: ubuntu-latest
+    needs: [build_linux, build_macos] # Add build_windows if enabled
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ github.workspace }}/artifacts
+          merge-multiple: true
+      - name: Publish to Github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+        run: >
+          cd ${{ github.workspace }}/artifacts &&
+          gh release upload ${{ github.ref_name }} *
