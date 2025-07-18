@@ -29,11 +29,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase owner name as environment variable
+        id: strings
+        shell: bash
+        run: |
+          INPUT=${{ github.repository_owner }}; echo "OWNER=${INPUT,,}">>${GITHUB_OUTPUT}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           file: ${{ github.workspace }}/Docker/Dockerfile
-          push: false # Do not push on CI builds
-          tags: ghcr.io/${{ github.repository_owner }}/iris-restful:latest 
+          push: true
+          tags: ghcr.io/${{ steps.strings.outputs.OWNER }}/iris-restful:latest 
           platforms: "linux/arm64,linux/arm/v7,linux/arm/v6,linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/386"
 
