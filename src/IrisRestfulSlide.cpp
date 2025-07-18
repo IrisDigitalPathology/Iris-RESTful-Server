@@ -47,12 +47,12 @@ _file                   (file),
 _abstraction            (abstract_file_structure(file->ptr, file->size)),
 _remove_from_server_dir (nullptr)
 {
-    std::cout << "SLIDE CREATED\n";
+    
 }
 __INTERNAL__Slide::~__INTERNAL__Slide()
 {
-    std::cout << "SLIDE REMOVED\n";
-    if (_remove_from_server_dir) _remove_from_server_dir ();
+    if (_remove_from_server_dir)
+        _remove_from_server_dir ();
 }
 void __INTERNAL__Slide::set_on_destroyed_callback(const std::function<void()> on_destroyed)
 {

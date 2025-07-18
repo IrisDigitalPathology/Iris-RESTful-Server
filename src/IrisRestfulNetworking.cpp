@@ -46,10 +46,11 @@ __INTERNAL__Session::__INTERNAL__Session(ASIOSocket_t&& socket, SSLContext_t& ct
 stream(std::make_unique<ASIOStream_t>(std::move(socket), ctx)),
 remote(ADDRESS_TO_STRING(stream->lowest_layer().remote_endpoint()))
 {
-    std::cout <<"NEW SESSION\n";
+    
 }
-__INTERNAL__Session::~__INTERNAL__Session() {
-    std::cout <<"SESSION EXPIRED\n";
+__INTERNAL__Session::~__INTERNAL__Session()
+{
+    
 }
 
 // Define Networking hub
@@ -307,13 +308,17 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
             
         // RESTful GET request
         case boost::beast::http::verb::head:
-        case boost::beast::http::verb::get:
+        case boost::beast::http::verb::get: {
+            std::string target = request.target();
+            if (target.length() == 1 && target.compare("/") == 0)
+                target.append("index.html");
+            
             // See __INTERNAL__Server::on_get_request (IrisRestfulServer.cpp) for implementation
-            _callbacks.onGetRequest(session, std::string(request.target()),[this,session, request]
+            _callbacks.onGetRequest(session, target,[this,session, request]
                                     (const std::unique_ptr<GetResponse>& response){
                 
                 switch (response->type) {
-                    // Tile Data response (most frequent type of response)
+                        // Tile Data response (most frequent type of response)
                     case GetResponse::GET_RESPONSE_TILE: {
                         auto __response     = reinterpret_cast<GetTileResponse*>(response.get());
                         auto tile_response  = GENERATE_TILE_RESPONSE(*__response);
@@ -321,7 +326,7 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
                         return send_buffer(session, tile_response, __response->pixelData);
                     }
                         
-                    // String / Text responses (returning text-formatted information)
+                        // String / Text responses (returning text-formatted information)
                     case GetResponse::GET_RESPONSE_UNDEFINED:
                     case GetResponse::GET_RESPONSE_MALFORMED_REQ:
                     case GetResponse::GET_RESPONSE_FILE_NOT_FOUND:
@@ -330,8 +335,8 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
                         FORMAT_RESPONSE(*string_response, request, _CORS);
                         return send_response(session, string_response);
                     }
-                    
-                    // File Server responses for Web server functionality (if enabled)
+                        
+                        // File Server responses for Web server functionality (if enabled)
                     case GetResponse::GET_RESPONSE_FILE: {
                         auto __response     = reinterpret_cast<GetFileResponse*>(response.get());
                         auto file_response  = GENERATE_FILE_RESPONSE(*__response);
@@ -339,10 +344,11 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
                         return send_file(session, file_response);
                     }
                         
-                    
+                        
                 }
             }); return;
-        
+        }
+            
         // RESTful POST request
         case http::verb::post:
         

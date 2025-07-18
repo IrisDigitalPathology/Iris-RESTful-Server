@@ -79,6 +79,7 @@ void INTERP_CSIGNAL (int param)
 int main(int argc, char* argv[])
 {
     int port = -1;
+    const char* arg_chars = NULL;
     Iris::RESTful::ServerCreateInfo info;
     if (argc < 2) {
         std::cerr << "Insufficient arguments\n" << intro_statement << help_statement;
@@ -89,7 +90,11 @@ int main(int argc, char* argv[])
                 std::cout << intro_statement << help_statement;
                 return EXIT_SUCCESS;
             case ARG_PORT: {
-                std::string port_str (argv[++argi]);
+                arg_chars = argi+1<argc?argv[++argi]:NULL;
+                if (!arg_chars) {
+                    std::cerr   << "No corresponding value given for port argument\n";
+                    return EXIT_FAILURE; }
+                std::string port_str (arg_chars);
                 auto result = std::from_chars(port_str.data(), port_str.data()+port_str.size(), port);
                 if (result.ec != std::errc{}) {
                     std::cerr   << "Failed to parse the provided port number from argument \""
@@ -106,13 +111,14 @@ int main(int argc, char* argv[])
             }
                 
             case ARG_DIR:
-                if (argi+1>=argc) {
+                arg_chars = argi+1<argc?argv[++argi]:NULL;
+                if (!arg_chars) {
                     FAILED_SLIDE_DIRECTORY:
                     std::cerr   << "Slide directory argument requires directory path\n"
                                 << help_statement;
                     return EXIT_FAILURE;
                 }
-                info.slide_dir = std::string(argv[++argi]);
+                info.slide_dir = std::string(arg_chars);
                 if (std::filesystem::is_directory(info.slide_dir) == false) {
                     std::cerr   << "OS reports the provided path for slide files \""
                                 << info.slide_dir
@@ -123,12 +129,13 @@ int main(int argc, char* argv[])
                 break;
                 
             case ARG_CERT:
-                if (argi+1>=argc) {
+                arg_chars = argi+1<argc?argv[++argi]:NULL;
+                if (!arg_chars) {
                     std::cerr   <<"Certificate argument requires PEM formatted cert file path\n"
                                 << help_statement;
                     return EXIT_FAILURE;
                 }
-                info.cert = std::string(argv[++argi]);
+                info.cert = std::string(arg_chars);
                 if (std::filesystem::exists(info.cert) == false) {
                     std::cerr   << "OS reports the provided file path for server cert \""
                                 << info.cert
@@ -139,12 +146,13 @@ int main(int argc, char* argv[])
                 break;
                 
             case ARG_KEY:
-                if (argi+1>=argc) {
+                arg_chars = argi+1<argc?argv[++argi]:NULL;
+                if (!arg_chars) {
                     std::cerr   <<"Private key argument requires PEM formatted key file path\n"
                                 << help_statement;
                     return EXIT_FAILURE;
                 }
-                info.key = std::string(argv[++argi]);
+                info.key = std::string(arg_chars);
                 if (std::filesystem::exists(info.key) == false) {
                     std::cerr   << "OS reports the provided file path for server private key "
                                 << info.key
@@ -155,22 +163,24 @@ int main(int argc, char* argv[])
                 break;
                 
             case ARG_CORS:
-                if (argi+1>=argc) {
+                arg_chars = argi+1<argc?argv[++argi]:NULL;
+                if (!arg_chars) {
                     std::cerr   <<"Cross origin resource sharing requires a valid domain\n"
                                 << help_statement;
                     return EXIT_FAILURE;
                 }
-                info.cors = std::string(argv[++argi]);
+                info.cors = std::string(arg_chars);
                 break;
                 
             case ARG_ROOT:
-                if (argi+1>=argc) {
+                arg_chars = argi+1<argc?argv[++argi]:NULL;
+                if (!arg_chars) {
                     FAILED_ROOT_FILE_DIR:
                     std::cerr   <<"Root file directory requires a valid file directory\n"
                                 << help_statement;
                     return EXIT_FAILURE;
                 }
-                info.doc_root = std::string(argv[++argi]);
+                info.doc_root = std::string(arg_chars);
                 if (std::filesystem::is_directory(info.doc_root) == false) {
                     std::cerr   << "OS reports the provided document root file path \""
                                 << info.doc_root
@@ -188,14 +198,13 @@ int main(int argc, char* argv[])
                 return EXIT_FAILURE;
         }
     }
-    
     auto server = Iris::RESTful::create_server (info);
     if (!server) {
         std::cout << "Failed to create an Iris RESTful server\n";
         return EXIT_FAILURE;
     }
     
-    auto result = Iris::RESTful::server_listen(server, port>-1?port:3000);
+    auto result = Iris::RESTful::server_listen(server, port);
     if (result != Iris::IRIS_SUCCESS) {
         std::cout << result.message;
         return EXIT_FAILURE;
