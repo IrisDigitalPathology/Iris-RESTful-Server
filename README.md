@@ -39,78 +39,8 @@ An example [Docker Compose YAML](./Docker/compose.yaml) is also provided for eas
 >[!NOTE]
 > IrisRESTful may be *optionally* configured  as a secure webserver for your viewer implementation. We do not recommend this architecture, and instead prefer a more modular microservice design; however operating as a webserver is a supported feature. If you are not using this optional webserver feature and instead are deploying IrisRESTful in a more modular capacity (as we suggest) you **must** enable **cross origin resource sharing (CORS)** to allow access to the Iris slides. See the below [Deployment Section](README.md#deployment) for more information on CORS.
 
-# API Explained
-
-The Iris RESTful API was designed to match the [DICOMweb](https://www.dicomstandard.org/using/dicomweb) (presently only the [WADO-RS](https://www.dicomstandard.org/using/dicomweb/retrieve-wado-rs-and-wado-uri)) API as a means of replacing the Deep Zoom Image reliance in OpenSeaDragon whole slide viewer implementations used in Digital Pathology. The Iris RESTful server supports 2 API:
-- Iris RESTful 
-- DICOMweb (WADO-RS)
-
-The specific API you plan to use will be indicated up front. Presently the API was intentionally limited to the HTTP URL target sequence for DICOMweb compatability. The entry points are as follows:
-- Iris RESTful API: `<URL>/slides/`
-- WADO-RS API: `<URL>/studies/`
-
-## Retrieve Metadata
-### Iris RESTful
-```
-GET <URL>/slides/<slide-name>/metadata 
-```
-Example: [https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata](https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata)
-### WADO-RS (supported calls)
-```
-GET <URL>/studies/<study>/series/<UID>/metadata 
-GET <URL>/studies/<study>/series/<UID>/instances/<layer-number>/metadata
-```
-Example: [https://examples.restful.irisdigitalpathology.org/studies/example/series/cervix_2x_jpeg/metadata](https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata)
-
-When using WADO-RS, it is important to note that Iris File Extension encodes the entire digital slide in a single file. It does **not** represent layers as individual files with duplicated metadata like native DICOM. Therefore there is only a single authoritative version of the metadata in IFE encode files and consequentially any metadata GET requests for a single layer / DICOM-instance (*code-block line 2*) returns only some metadata when called. It is preferred that viewers simply call the entire slide metadata (*line 1*), which contains an array of layer specific information as well. 
-### Metadata Structure
-Metadata is returned in the form of a JSON object with the structure shown in the below example.
-```json
-{
-    "type": "iris_metadata",      
-    "format": "FORMAT_R8G8B8A8",    
-    "encoding": "image/jpeg",      
-    "extent": {
-        "width": 1983,              
-        "height": 1381,             
-        "layers": [                 
-            {                       
-                "x_tiles": 8,      
-                "y_tiles": 6,
-                "scale": 1.0
-            },
-            {
-                "x_tiles": 31,      
-                "y_tiles": 22,
-                "scale": 4.0
-            },
-            {
-                "x_tiles": 124,     
-                "y_tiles": 87,
-                "scale": 16.0
-            },
-            {
-                "x_tiles": 496,     
-                "y_tiles": 346,
-                "scale": 64.0
-            }
-        ]
-    },
-    "attributes" : {                
-        "aperio.ScannerType" : "GT450"
-    },
-    "associated_images": [          
-        "thumbnail",
-        "tabel",
-    ],
-}
-```
-
-> [!WARNING]
-> THIS SECTION IS INCOMPLETE
-
 # Deployment
-IrisRESTful may be depolyed as a containerized implementation or may be natively run on your hardware. We **strongly suggest** deploying IrisRESTful as a container rather than running it natively. The container can be built from source or pulled from our [container repository on Github (GHCR)](ghcr.io/iris-digital-pathology/iris-restful). If you wish to build from source, please use our CMakeList.txt scripts as CMake is our only supported build system. 
+IrisRESTful may be deployed as a containerized implementation or may be natively run on your hardware. We **strongly suggest** deploying IrisRESTful as a container rather than running it natively. The container can be built from source or pulled from our [container repository on Github (GHCR)](ghcr.io/iris-digital-pathology/iris-restful). If you wish to build from source, please use our CMakeList.txt scripts as CMake is our only supported build system. 
 
 Iris RESTful is run with the following arguments:\
 **Arugments:**
@@ -201,6 +131,76 @@ IFE will now look for both IFE encoded slides as well as just generic files with
     });
 
 </script>
+```
+
+> [!WARNING]
+> THIS SECTION IS INCOMPLETE
+
+# API Explained
+
+The Iris RESTful API was designed to match the [DICOMweb](https://www.dicomstandard.org/using/dicomweb) (presently only the [WADO-RS](https://www.dicomstandard.org/using/dicomweb/retrieve-wado-rs-and-wado-uri)) API as a means of replacing the Deep Zoom Image reliance in OpenSeaDragon whole slide viewer implementations used in Digital Pathology. The Iris RESTful server supports 2 API:
+- Iris RESTful 
+- DICOMweb (WADO-RS)
+
+The specific API you plan to use will be indicated up front. Presently the API was intentionally limited to the HTTP URL target sequence for DICOMweb compatability. The entry points are as follows:
+- Iris RESTful API: `<URL>/slides/`
+- WADO-RS API: `<URL>/studies/`
+
+## Retrieve Metadata
+### Iris RESTful
+```
+GET <URL>/slides/<slide-name>/metadata 
+```
+Example: [https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata](https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata)
+### WADO-RS (supported calls)
+```
+GET <URL>/studies/<study>/series/<UID>/metadata 
+GET <URL>/studies/<study>/series/<UID>/instances/<layer-number>/metadata
+```
+Example: [https://examples.restful.irisdigitalpathology.org/studies/example/series/cervix_2x_jpeg/metadata](https://examples.restful.irisdigitalpathology.org/slides/cervix_2x_jpeg/metadata)
+
+When using WADO-RS, it is important to note that Iris File Extension encodes the entire digital slide in a single file. It does **not** represent layers as individual files with duplicated metadata like native DICOM. Therefore there is only a single authoritative version of the metadata in IFE encode files and consequentially any metadata GET requests for a single layer / DICOM-instance (*code-block line 2*) returns only some metadata when called. It is preferred that viewers simply call the entire slide metadata (*line 1*), which contains an array of layer specific information as well. 
+### Metadata Structure
+Metadata is returned in the form of a JSON object with the structure shown in the below example.
+```json
+{
+    "type": "iris_metadata",      
+    "format": "FORMAT_R8G8B8A8",    
+    "encoding": "image/jpeg",      
+    "extent": {
+        "width": 1983,              
+        "height": 1381,             
+        "layers": [                 
+            {                       
+                "x_tiles": 8,      
+                "y_tiles": 6,
+                "scale": 1.0
+            },
+            {
+                "x_tiles": 31,      
+                "y_tiles": 22,
+                "scale": 4.0
+            },
+            {
+                "x_tiles": 124,     
+                "y_tiles": 87,
+                "scale": 16.0
+            },
+            {
+                "x_tiles": 496,     
+                "y_tiles": 346,
+                "scale": 64.0
+            }
+        ]
+    },
+    "attributes" : {                
+        "aperio.ScannerType" : "GT450"
+    },
+    "associated_images": [          
+        "thumbnail",
+        "tabel",
+    ],
+}
 ```
 
 > [!WARNING]
