@@ -32,7 +32,7 @@ GET <URL>/studies/<study>/series/<UID>/instances/<layer>/frames/<tile>
 ### Deployment Introduction
 Deploying an IrisRESTful Server is extremely simple. We recommend container deployment, but we describe the different methods for hosting a slide server in the [Deployment Section](README.md#deployment). The following is a one-line deployment with `${SLIDES_DIRECTORY}` aliasing a directory that will be mounted to the container and contains the Iris slide files and `${CONNECTION_PORT}` describing the port that the container will use to listen. 
 ```sh
-docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest
+docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/irisdigitalpathology/iris-restful:latest
 ```
 An example [Docker Compose YAML](./Docker/compose.yaml) is also provided for ease in deployment.
 
@@ -40,7 +40,7 @@ An example [Docker Compose YAML](./Docker/compose.yaml) is also provided for eas
 > IrisRESTful may be *optionally* configured  as a secure webserver for your viewer implementation. We do not recommend this architecture, and instead prefer a more modular microservice design; however operating as a webserver is a supported feature. If you are not using this optional webserver feature and instead are deploying IrisRESTful in a more modular capacity (as we suggest) you **must** enable **cross origin resource sharing (CORS)** to allow access to the Iris slides. See the below [Deployment Section](README.md#deployment) for more information on CORS.
 
 # Deployment
-IrisRESTful may be deployed as a containerized implementation or may be natively run on your hardware. We **strongly suggest** deploying IrisRESTful as a container rather than running it natively. The container can be built from source or pulled from our [container repository on Github (GHCR)](ghcr.io/iris-digital-pathology/iris-restful). If you wish to build from source, please use our CMakeList.txt scripts as CMake is our only supported build system. 
+IrisRESTful may be deployed as a containerized implementation or may be natively run on your hardware. We **strongly suggest** deploying IrisRESTful as a container rather than running it natively. The container can be built from source or pulled from our [container repository on Github (GHCR)](ghcr.io/irisdigitalpathology/iris-restful). If you wish to build from source, please use our CMakeList.txt scripts as CMake is our only supported build system. 
 
 Iris RESTful is run with the following arguments:\
 **Arugments:**
@@ -63,7 +63,7 @@ IrisRESTful -d /slides -p 3000 -c /etc/ssh/cert.pem -k /ect/ssh/private/key.pem 
 
 This implementation works with the provided container by overloading the default CMD arguments (`IrisRESTful` is the entry point)
 ```sh
-docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${CERT_ROOT}:/ect/ssh -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 -c /etc/ssh/cert.pem -k /ect/ssh/private/key.pem -o your-domain.com
+docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${CERT_ROOT}:/ect/ssh -p ${CONNECTION_PORT}:3000 ghcr.io/irisdigitalpathology/iris-restful:latest -d /slides -p 3000 -c /etc/ssh/cert.pem -k /ect/ssh/private/key.pem -o your-domain.com
 ```
 
 ## IrisRESTful can be deployed in two modes: 
@@ -80,20 +80,20 @@ docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${CERT_ROOT}:/ect/ssh -p ${CONNE
         ```
     - As such you **should** (but are not obligated) to provide IrisRESTful with your web viewer's domain.
         ```sh
-        docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --cors ${YOUR_DOMAIN.COM}
+        docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/irisdigitalpathology/iris-restful:latest -d /slides -p 3000 --cors ${YOUR_DOMAIN.COM}
         ```
         If you do not provide a domain, the response headers will contain the `Access-Control-Allow-Origin':'*'` (wild-card header).
 2) **WEBVIEWER SLIDE-SERVER**: As a static file server webserver with slide serving capabilities. This abilitiy is activated by providing the document root ('doc-root') containing your viewer webpage.
     - This requires providing a directory path to a valid directory (`/doc_root`) containing the static files for which you want clients to have access.
         ```sh
-        docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${WEBSITE_DIR}:/doc_root -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --root /doc_root
+        docker run --rm -v${SLIDES_DIRECTORY}:/slides -v${WEBSITE_DIR}:/doc_root -p ${CONNECTION_PORT}:3000 ghcr.io/irisdigitalpathology/iris-restful:latest -d /slides -p 3000 --root /doc_root
         ```
         Iris is security oriented and will only serve up files of a select few known extensions. Additional extensions can be added. Legacy image files like Deep Zoom Images (DZI) can also be served up using this mechanism ([See FAQ below](#does-the-iris-restful-servers-optional-ability-to-act-as-a-file-server-allow-it-to-issue-both-dzi-and-iris-style-files))
 ## FAQ
 ### Does the Iris RESTful Server's optional ability to act as a file server allow it to issue both DZI and Iris encoded files? 
 **Answer: Yes**. If there are custom implementations within your IMS and viewer stack that require some slides be served from a legacy DZI format, you may do so by activating Iris' document root to your DZI containing directory. <u>This will result in a server that issues both IFE and DZI files</u>. In this example, we have a directory that contains both IFE and DZI files (`/slides`) that we wish to mount to the Iris RESTful container(s). 
 ```sh
-docker run --rm -p<host-port>:3000 -v<slide-dir>:/slides docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/iris-digital-pathology/iris-restful:latest -d /slides -p 3000 --root /slides
+docker run --rm -p<host-port>:3000 -v<slide-dir>:/slides docker run --rm -v${SLIDES_DIRECTORY}:/slides -p ${CONNECTION_PORT}:3000 ghcr.io/irisdigitalpathology/iris-restful:latest -d /slides -p 3000 --root /slides
 ```
 IFE will now look for both IFE encoded slides as well as just generic files within this directory. Iris RESTful is security oriented and therefore only returns files of known extension with a defined MIME, including DZI files.
 >[!NOTE]
