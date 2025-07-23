@@ -59,7 +59,7 @@ __INTERNAL__Networking::__INTERNAL__Networking (const ServerCallbacks &cb,
                                                 const fs_path& key,
                                                 const Address& CORS) :
 _callbacks  (cb),
-_reactors   (IRIS_CONCURRENCY),
+_reactors   (IRIS_CONCURRENCY * 3),
 _context    (std::make_shared<ASIOContext_t>(_reactors.size())),
 _guard      (std::make_shared<ASIOGuard_t>(_context->get_executor())),
 _ssl        (CREATE_SSL_CONTEXT(cert, key)),

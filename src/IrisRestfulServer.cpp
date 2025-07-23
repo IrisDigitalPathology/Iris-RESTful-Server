@@ -101,7 +101,7 @@ _networking (std::make_unique<__INTERNAL__Networking>(ServerCallbacks {
     .onGetRequest = std::bind(&__INTERNAL__Server::on_get_request, this, _1, _2, _3),
 }, info.cert, info.key, info.cors.length()?info.cors:_doc_root.empty()?"*":"")),
 // ^Assign a designated CORS, if empty assign * only if no webserver root.
-_threads(Async::createThreadPool())
+_threads(Async::createThreadPool(IRIS_CONCURRENCY * 3))
 {
     
 }
