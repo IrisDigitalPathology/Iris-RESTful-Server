@@ -39,7 +39,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           file: ${{ github.workspace }}/Docker/Dockerfile
-          push: true
+          push: false
           tags: ghcr.io/${{ steps.strings.outputs.OWNER }}/iris-restful:latest 
           platforms: "linux/arm64,linux/arm/v7,linux/arm/v6,linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/386"
 
