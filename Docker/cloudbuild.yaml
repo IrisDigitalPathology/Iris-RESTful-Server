@@ -1,20 +1,11 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: 
-    - 'build'
-    - Docker
-    - '-f'
-    - Docker/Dockerfile
-    - '-t'
-    - gcr.io/$PROJECT_ID/iris-restful:latest
-    - .
+  args: ['build', '-f', 'Docker/Dockerfile', '-t', 'gcr.io/$PROJECT_ID/iris-restful:latest', '.']
   id: Build-Image
 
 # Optional: If you want to push the image to Google Container Registry (GCR) or Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
-  args: 
-    - 'push'
-    -  'gcr.io/$PROJECT_ID/iris-restful:latest'
+  args: ['push', 'gcr.io/$PROJECT_ID/iris-restful:latest']
   id: Push-Image
   waitFor: ['Build-Image'] # Ensures the build step completes successfully before pushing
 
