@@ -15,6 +15,7 @@ namespace Iris {
 namespace RESTful {
 
 class __INTERNAL__Server {
+    friend class __INTERNAL__Networking;
     const std::filesystem::path     _root;
     const std::filesystem::path     _doc_root;
     struct : public std::unordered_map<std::string,
@@ -29,11 +30,15 @@ public:
     __INTERNAL__Server& operator == (const __INTERNAL__Server&) = delete;
     void listen                     (uint16_t port);
     
-private:
-    Slide   get_slide               (const std::string& idenfifier);
-    void    on_get_request          (const Session&,
+protected:
+    template <class Session_>
+    void    on_get_request          (const Session_&,
                                      const std::string&,
                                      const std::function<void(const std::unique_ptr<GetResponse>&)>);
+    
+private:
+    Slide   get_slide               (const std::string& idenfifier);
+    
 //    void on_post_request            (const Session&,
 //                                     const std::string_view&,
 //                                     const std::function<void(std::unique_ptr<PostResponse&>)>);

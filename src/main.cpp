@@ -25,7 +25,8 @@ constexpr char help_statement[] =
 -k --key: Private key in PEM format to sign argument provided in CERT\n\
 -o --cors: Slide viewer domain. Returned in 'Access-Control-Allow-Origin' header\n\
 -r --root: Web viewer server document root directory for activating RESTful server as file server\n\
-If run without defining the -r/--root option, HTTPS responses will contain \
+--http-only --no-https: Disable TLS / SSL layer. Server will respond to HTTP rather than HTTPS.\
+If run without defining the -r/--root option, HTTP(S) responses will contain \
 'Access-Control-Allow-Origin':'*' unless the `-o/--cors option` is defined. \n\
 \n\
 Usage: IrisRESTful -p <port> -d <slide_root> -c <cert.pem> -k <key.pem> -r <document_root>\n\
@@ -40,24 +41,27 @@ enum ArgumentFlag : uint32_t {
     ARG_KEY,
     ARG_CORS,
     ARG_ROOT,
+    ARG_HTTP,
     ARG_INVALID = UINT32_MAX
 };
 
 inline ArgumentFlag PARSE_ARGUMENT (const char* arg_str) {
-    if (strstr(arg_str,"-h") || strstr(arg_str, "--help"))
+    if (!strcmp(arg_str,"-h") || !strcmp(arg_str, "--help"))
         return ARG_HELP;
-    if (strstr(arg_str,"-p") || strstr(arg_str, "--port"))
+    if (!strcmp(arg_str,"-p") || !strcmp(arg_str, "--port"))
         return ARG_PORT;
-    if (strstr(arg_str,"-d") || strstr(arg_str, "--dir"))
+    if (!strcmp(arg_str,"-d") || !strcmp(arg_str, "--dir"))
         return ARG_DIR;
-    if (strstr(arg_str,"-c") || strstr(arg_str, "--cert"))
+    if (!strcmp(arg_str,"-c") || !strcmp(arg_str, "--cert"))
         return ARG_CERT;
-    if (strstr(arg_str,"-k") || strstr(arg_str, "--key"))
+    if (!strcmp(arg_str,"-k") || !strcmp(arg_str, "--key"))
         return ARG_KEY;
-    if (strstr(arg_str,"-o") || strstr(arg_str, "--cors"))
+    if (!strcmp(arg_str,"-o") || !strcmp(arg_str, "--cors"))
         return ARG_CORS;
-    if (strstr(arg_str,"-r") || strstr(arg_str, "--root"))
+    if (!strcmp(arg_str,"-r") || !strcmp(arg_str, "--root"))
         return ARG_ROOT;
+    if (!strcmp(arg_str,"--http-only") || !strcmp(arg_str, "--no-https"))
+        return ARG_HTTP;
     return ARG_INVALID;
 }
 
@@ -188,6 +192,11 @@ int main(int argc, char* argv[])
                                 << help_statement;
                     return EXIT_FAILURE;
                 }
+                break;
+                
+            case ARG_HTTP:
+                info.https = false;
+                std::cout << "[WARNING] Running with TLS manually disabled. The server will only respond to HTTP and will NOT respond to HTTPS. If this was unintentional and you wish for end-to-end encryption, remove the --no-https line.\n";
                 break;
                 
             case ARG_INVALID:

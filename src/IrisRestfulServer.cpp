@@ -97,11 +97,9 @@ using namespace std::placeholders;
 __INTERNAL__Server::__INTERNAL__Server(const ServerCreateInfo& info) :
 _root       (info.slide_dir),
 _doc_root   (info.doc_root),
-_networking (std::make_unique<__INTERNAL__Networking>(ServerCallbacks {
-    .onGetRequest = std::bind(&__INTERNAL__Server::on_get_request, this, _1, _2, _3),
-}, info.cert, info.key, info.cors.length()?info.cors:_doc_root.empty()?"*":"")),
+_networking (std::make_unique<__INTERNAL__Networking>(this, info.https, info.cert, info.key, info.cors.length()?info.cors:_doc_root.empty()?"*":"")),
 // ^Assign a designated CORS, if empty assign * only if no webserver root.
-_threads(Async::createThreadPool())
+_threads(Async::createThreadPool(IRIS_CONCURRENCY * 3))
 {
     
 }
@@ -229,7 +227,8 @@ Slide __INTERNAL__Server::get_slide (const std::string &id)
     });
     return slide;
 }
-void __INTERNAL__Server::on_get_request(const Session& session,
+template <class Session_>
+void __INTERNAL__Server::on_get_request(const Session_& session,
                                         const std::string& target,
                                         const std::function<void(const std::unique_ptr<GetResponse>&)> on_response)
 {
@@ -306,5 +305,10 @@ void __INTERNAL__Server::on_get_request(const Session& session,
         on_response (response);
     });
 }
+// Generate the implementations for Sessions and TLS Sessions
+template void __INTERNAL__Server::on_get_request <Session>
+ (const Session&,  const std::string&, const std::function<void(const std::unique_ptr<GetResponse>&)>);
+template void __INTERNAL__Server::on_get_request <SslSession>
+ (const SslSession &, const std::string &, const std::function<void (const std::unique_ptr<GetResponse> &)>);
 } // END RESTFUL
 } // END IRIS

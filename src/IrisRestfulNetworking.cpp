@@ -42,9 +42,9 @@ std::shared_ptr<boost::asio::ssl::context> CREATE_SSL_CONTEXT
 inline std::string ADDRESS_TO_STRING (const tcp::endpoint& endpoint) {
     return endpoint.address().to_string()+":"+std::to_string(endpoint.port());
 }
-__INTERNAL__Session::__INTERNAL__Session(ASIOSocket_t&& socket, SSLContext_t& ctx) :
-stream(std::make_unique<ASIOStream_t>(std::move(socket), ctx)),
-remote(ADDRESS_TO_STRING(stream->lowest_layer().remote_endpoint()))
+__INTERNAL__Session::__INTERNAL__Session(ASIOSocket_t&& socket) :
+stream(std::make_unique<ASIOStream_t>(std::move(socket))),
+remote(ADDRESS_TO_STRING(stream->socket().remote_endpoint()))
 {
     
 }
@@ -52,22 +52,33 @@ __INTERNAL__Session::~__INTERNAL__Session()
 {
     
 }
+__INTERNAL__SslSession::__INTERNAL__SslSession(ASIOSocket_t&& socket, SSLContext_t& ctx) :
+stream(std::make_unique<ASIOSslStream_t>(std::move(socket), ctx)),
+remote(ADDRESS_TO_STRING(stream->lowest_layer().remote_endpoint()))
+{
+    
+}
+__INTERNAL__SslSession::~__INTERNAL__SslSession()
+{
+    
+}
 
 // Define Networking hub
-__INTERNAL__Networking::__INTERNAL__Networking (const ServerCallbacks &cb,
+__INTERNAL__Networking::__INTERNAL__Networking (__INTERNAL__Server* const & server,
+                                                bool https,
                                                 const fs_path& cert,
                                                 const fs_path& key,
                                                 const Address& CORS) :
-_callbacks  (cb),
-_reactors   (IRIS_CONCURRENCY),
+_server     (server),
+_reactors   (IRIS_CONCURRENCY * 3),
 _context    (std::make_shared<ASIOContext_t>(_reactors.size())),
 _guard      (std::make_shared<ASIOGuard_t>(_context->get_executor())),
-_ssl        (CREATE_SSL_CONTEXT(cert, key)),
+_ssl        (https?CREATE_SSL_CONTEXT(cert, key):nullptr),
 _CORS       (CORS),
 _acceptor   (nullptr),
 ACTIVE      (true)
 {
-    if (!_ssl) throw std::runtime_error ("Failed to create SSL context");
+//    if (!_ssl) throw std::runtime_error ("Failed to create SSL context");
     
     for (auto&& thread : const_cast<Threads&>(_reactors))
         thread = std::thread {[this](){
@@ -167,24 +178,33 @@ void __INTERNAL__Networking::accept_connection(const ASIOAcceptor &acceptor)
         // Perpetuate the accept connection calls to keep the acceptor alive
         // If we have closed the acceptor, then gracefully exit and destroy acceptor
         if (acceptor->is_open()) accept_connection (acceptor);
-        
-        // Create a stream and begin reading messages
-        auto session = std::make_shared<__INTERNAL__Session>(std::move(socket), *_ssl);
-        beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
-        (*session->stream).async_handshake(ssl::stream_base::server,[this,session]
-                                           (beast::error_code error){
-            if (error) {
-                std::cerr   << "["<<session->stream->lowest_layer().remote_endpoint()<<"]"
-                            << "Error in performing SSL handshake: "
-                            << error.message() << "\n";
-            } else {
-                read_request (session);
-            }
-               
-        });
+    
+        if (_ssl) {
+            // Create a stream and begin reading messages
+            auto session = std::make_shared<__INTERNAL__SslSession>(std::move(socket), *_ssl);
+            beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
+            (*session->stream).async_handshake(ssl::stream_base::server,[this,session]
+                                               (beast::error_code error){
+                if (error) {
+                    std::cerr   << "["<<session->remote<<"]"
+                                << "Error in performing SSL handshake: "
+                                << error.message() << "\n";
+                } else read_request (session);
+         });
+        } else {
+            // Create a stream and begin reading messages
+            auto session = std::make_shared<__INTERNAL__Session>(std::move(socket));
+            beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
+            read_request (session);
+        }
     });
 }
-void __INTERNAL__Networking::read_request(const Session &session)
+template<class Session_> bool IS_STREAM_OPEN (const Session_& session)
+{
+    return beast::get_lowest_layer(*session->stream).socket().is_open();
+}
+template<class Session_>
+void __INTERNAL__Networking::read_request(const Session_ &session)
 {
     // Extend the expiration time
     // This is ABSOLUTELY VITAL. Failure to do this will signficantly affect performance
@@ -295,9 +315,10 @@ inline void FORMAT_RESPONSE (http::response<T>& response, const HTTPRequest_t &r
     response.keep_alive(request.keep_alive());
     response.prepare_payload();
 }
-void __INTERNAL__Networking::interpret_request(const Session& session, const HTTPRequest_t &request)
+template<class Session_>
+void __INTERNAL__Networking::interpret_request(const Session_& session, const HTTPRequest_t &request)
 {
-    // The _callbacks.on_X_Request callbacks use a nested callback for a VERY good reason.
+    // The _server->.on_X_Request callbacks use a nested callback for a VERY good reason.
     // This allows the __INTERNAL__Server instance to push the implementation off the stack
     // to a separate worker thread and remove it from this ASIO/NetowrkingTS reactor thread.
     // I want to allow the ASIO threads to only work on the network queue.
@@ -314,7 +335,7 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
                 target.append("index.html");
             
             // See __INTERNAL__Server::on_get_request (IrisRestfulServer.cpp) for implementation
-            _callbacks.onGetRequest(session, target,[this,session, request]
+            _server->on_get_request(session, target, [this,session, request]
                                     (const std::unique_ptr<GetResponse>& response){
                 
                 switch (response->type) {
@@ -369,7 +390,8 @@ void __INTERNAL__Networking::interpret_request(const Session& session, const HTT
         }
     }
 }
-void __INTERNAL__Networking::send_response(const Session &session, const HTTPResponse &response)
+template<class Session_>
+void __INTERNAL__Networking::send_response(const Session_ &session, const HTTPResponse &response)
 {
     http::async_write(*session->stream, *response,
                       [this, session, response]
@@ -377,12 +399,13 @@ void __INTERNAL__Networking::send_response(const Session &session, const HTTPRes
         if (error) std::cerr    << "["<<session->remote<<"] "
                                 << "Error writing response to stream: "
                                 << error.message();
-        if (response->keep_alive() && session->stream->lowest_layer().is_open())
+        if (response->keep_alive() && IS_STREAM_OPEN(session))
                 read_request (session);
         else    close_stream (session);
     });
 }
-void __INTERNAL__Networking::send_buffer(const Session &session, const HTTPResponseBuffer &response, const Buffer &buffer)
+template<class Session_>
+void __INTERNAL__Networking::send_buffer(const Session_ &session, const HTTPResponseBuffer &response, const Buffer &buffer)
 {
 //    auto serializer = std::make_shared<http::serializer<false, http::buffer_body>> (*response);
     http::async_write(*session->stream, *response,
@@ -391,12 +414,13 @@ void __INTERNAL__Networking::send_buffer(const Session &session, const HTTPRespo
         if (error) std::cerr    << "["<<session->remote<<"] "
                                 << "Error writing bin buffer response to stream: "
                                 << error.message();
-        if (response->keep_alive() && session->stream->lowest_layer().is_open())
+        if (response->keep_alive() && IS_STREAM_OPEN(session))
                 read_request (session);
         else    close_stream (session);
     });
 }
-void __INTERNAL__Networking::send_file(const Session &session, const HTTPResponseFile &response)
+template<class Session_>
+void __INTERNAL__Networking::send_file(const Session_ &session, const HTTPResponseFile &response)
 {
     http::async_write(*session->stream, *response,
                       [this, session, response]
@@ -404,23 +428,34 @@ void __INTERNAL__Networking::send_file(const Session &session, const HTTPRespons
         if (error) std::cerr    << "["<<session->remote<<"] "
                                 << "Error writing file response to stream: "
                                 << error.message();
-        if (response->keep_alive() && session->stream->lowest_layer().is_open())
+        if (response->keep_alive() && IS_STREAM_OPEN(session))
                 read_request (session);
         else    close_stream (session);
     });
 }
-void __INTERNAL__Networking::close_stream(const Session &session)
+template<> void __INTERNAL__Networking::close_stream<Session>(const Session& session)
 {
     beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
     beast::error_code error;
-    if (session->stream->lowest_layer().is_open())
+    if (IS_STREAM_OPEN(session))
+        (*session->stream).socket().shutdown(tcp::socket::shutdown_send);
+    if (error == net::ssl::error::stream_truncated ||
+        error == net::error::broken_pipe);
+    else if (error) std::cerr    << "["<<session->remote<<"] "
+                            << "Error in closing the stream: "
+                            << error.message() << "\n";
+}
+template<> void __INTERNAL__Networking::close_stream<SslSession>(const SslSession& session)
+{
+    beast::get_lowest_layer(*session->stream).expires_after(Time::seconds(30));
+    beast::error_code error;
+    if (beast::get_lowest_layer(*session->stream).socket().is_open())
         (*session->stream).shutdown(error);
     if (error == net::ssl::error::stream_truncated ||
         error == net::error::broken_pipe);
     else if (error) std::cerr    << "["<<session->remote<<"] "
                             << "Error in closing the stream: "
                             << error.message() << "\n";
-    
 }
 } // END RESTFUL
 } // END IRIS
