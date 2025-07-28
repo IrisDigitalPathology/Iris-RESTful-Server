@@ -35,7 +35,8 @@ using ASIOResolver_t                = ip::tcp::resolver;
 using ASIOEndpoint_t                = ip::tcp::endpoint;
 using ASIOAcceptor_t                = ip::tcp::acceptor;
 using ASIOSocket_t                  = ip::tcp::socket;
-using ASIOStream_t                  = ssl::stream<beast::tcp_stream>;
+using ASIOStream_t                  = beast::tcp_stream;
+using ASIOSslStream_t               = ssl::stream<beast::tcp_stream>;
 using ASIOBuffer_t                  = beast::flat_buffer;
 using HTTPRequest_t                 = http::request<http::string_body>;
 using HTTPResponse_t                = http::response<http::string_body>;
@@ -52,6 +53,7 @@ class ASIOEndpoint_t;
 class ASIOAcceptor_t;
 class ASIOSocket_t;
 class ASIOStream_t;
+class ASIOSslStream_t;
 class ASIOFlatBuffer_t;
 class HTTPRequest_t;
 class ASIOBuffer_t;
@@ -63,6 +65,7 @@ class HTTPRequestParser_t;
 #endif
 class   __INTERNAL__Networking;
 struct  __INTERNAL__Session;
+struct  __INTERNAL__SslSession;
 class   __INTERNAL__Slide;
 using ASIOContext                   = std::shared_ptr<ASIOContext_t>;
 using SSLContext                    = std::shared_ptr<SSLContext_t>;
@@ -71,6 +74,7 @@ using ASIOResolver                  = std::shared_ptr<ASIOResolver_t>;
 using ASIOEndpoint                  = std::shared_ptr<ASIOEndpoint_t>;
 using ASIOAcceptor                  = std::shared_ptr<ASIOAcceptor_t>;
 using ASIOStream                    = std::unique_ptr<ASIOStream_t>;
+using ASIOSslStream                 = std::unique_ptr<ASIOSslStream_t>;
 using ASIOBuffer                    = std::shared_ptr<ASIOBuffer_t>;
 using HTTPRequest                   = std::shared_ptr<HTTPRequest_t>;
 using HTTPResponse                  = std::shared_ptr<HTTPResponse_t>;
@@ -79,6 +83,7 @@ using HTTPResponseFile              = std::shared_ptr<HTTPResponseFile_t>;
 using HTTPRequestParser             = std::shared_ptr<HTTPRequestParser_t>;
 using Networking                    = std::unique_ptr<__INTERNAL__Networking>;
 using Session                       = std::shared_ptr<__INTERNAL__Session>;
+using SslSession                    = std::shared_ptr<__INTERNAL__SslSession>;
 using Slide                         = std::shared_ptr<__INTERNAL__Slide>;
 using SlideInfo                     = IrisCodec::SlideInfo;
 
@@ -92,18 +97,24 @@ using SlideInfo                     = IrisCodec::SlideInfo;
  * 
  * While the SSL certificate and key are optional, they are highly recommended
  * for secure connections. If not provided, the server will generate a self-signed certificate
- * and private key at runtime, which may not be suitable for production use.
- * 
+ * and private key at runtime.
+ *
+ * We highly recommend using Transport Layer Security (TLS) with HTTPS encryption
+ * ending at the server instance; however, we recognize that some implementations
+ * may not accept HTTPS ending at the service (such as Google Cloud Run, for example)
+ * so you can disable TLS and use only HTTP (see below).
+ *
  * @note The `doc_root` is optional and is used when the server acts as a web server
  * to serve the webpages, such as the viewer. If not specified, the server must be configured with
  * cross origin resource sharing (CORS) to allow access to the Iris slides.
  */
 struct ServerCreateInfo {
-    std::filesystem::path slide_dir; /*!< Directory containing the Iris slides */
-    std::filesystem::path cert;      /*!< Certificate for SSL connections in PEM format */
-    std::filesystem::path key;       /*!< Private key for SSL connections in PEM format*/
-    std::filesystem::path doc_root;  /*!< Optional document root when acting as a websever */
-    std::string           cors;      /*!< Optional cross origin policy*/
+    std::filesystem::path   slide_dir; /*!< Directory containing the Iris slides */
+    std::filesystem::path   cert;      /*!< Certificate for SSL connections in PEM format */
+    std::filesystem::path   key;       /*!< Private key for SSL connections in PEM format*/
+    std::filesystem::path   doc_root;  /*!< Optional document root when acting as a websever */
+    std::string             cors;      /*!< Optional cross origin policy*/
+    bool                    https=true;/*!< Default enable TLS layer for HTTPS messages*/
 };
 
 struct GetRequest {
@@ -177,27 +188,6 @@ struct GetMetadataRequest : public GetRequest {
 };
 struct MetadataResponse {
     
-};
-
-// The ServerCallbacks use a nested callback for a VERY good reason.
-// This allows the __INTERNAL__Server instance to push the implementation off the stack
-// to separate worker threads and remove it from an ASIO/NetowrkingTS reactor thread.
-// I want to reduce the reactor stack size and dedicate it to clearing the network queue.
-// Do not mess with this design if you don't know what I'm talking about or without asking me.
-// - Ryan
-struct ServerCallbacks {
-    std::function<void
-    (const Session& session, const std::string& target,
-     const std::function<void(const std::unique_ptr<GetResponse>&)>)>
-    onGetRequest                    = nullptr;
-    std::function<void
-    (const Session& session, const std::string& target,
-     const std::function<void(const std::unique_ptr<GetResponse>&)>)>
-    onPostRequest                   = nullptr;
-    std::function<void
-    (const Session& session, const std::string& target,
-     const std::function<void(const std::unique_ptr<GetResponse>&)>)>
-    onPutRequest                    = nullptr;
 };
 } // END RESTFUL
 } // END IRIS
